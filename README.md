@@ -1,5 +1,8 @@
 # Renforce
 
+> **Reinforce** concepts from LaTeX notes with intelligent Anki flashcards  
+> *renforce* = reinforce + enforce + renforcer (French: to strengthen)
+
 > Automatically sync LaTeX notes to Anki flashcards with LLM-powered generation
 
 Renforce is a production-ready command-line tool that monitors your Git repository of LaTeX notes, extracts structured content (definitions, theorems, propositions, examples), and automatically generates high-quality Anki flashcards. Now with optional LLM-powered card generation for active recall and permanent GUID tracking to preserve review history.

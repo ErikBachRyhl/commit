@@ -43,10 +43,14 @@ setup.sh
 htmlcov/
 .tox/
 
-# AnkiTex specific
+# Renforce specific
 .anki_tex_state.json
 dist/
 *.apkg
+
+# Config files (per-user in notes repos)
+# Uncomment if you want to track example configs:
+# !example/renforce.yml
 
 # OS
 .DS_Store

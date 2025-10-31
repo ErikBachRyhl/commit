@@ -11,10 +11,30 @@ from rich import print as rprint
 from . import __version__
 
 app = typer.Typer(
-    name="anki-tex",
-    help="Sync LaTeX notes to Anki flashcards",
+    name="renforce",
+    help="Renforce - Reinforce concepts from LaTeX notes with intelligent Anki flashcards",
     add_completion=False,
 )
+
+def version_callback(value: bool):
+    """Show version and exit."""
+    if value:
+        console.print("Renforce version 0.1.0")
+        raise typer.Exit()
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        None,
+        "--version",
+        "-v",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit",
+    )
+):
+    """Renforce - Reinforce concepts from LaTeX notes with intelligent Anki flashcards."""
+    pass
 
 console = Console()
 

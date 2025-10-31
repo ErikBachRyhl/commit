@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from git import Repo
-from git.exc import GitCommandError, InvalidGitRepositoryError
+from git.exc import GitCommandError, InvalidGitRepositoryError, NoSuchPathError
 
 
 class GitError(Exception):
@@ -30,6 +30,8 @@ def get_repo(repo_path: Path) -> Repo:
         return Repo(repo_path, search_parent_directories=True)
     except InvalidGitRepositoryError as e:
         raise GitError(f"Not a valid Git repository: {repo_path}") from e
+    except NoSuchPathError as e:
+        raise GitError(f"Path does not exist: {repo_path}") from e
 
 
 def get_current_sha(repo_path: Path) -> str:

@@ -87,8 +87,8 @@ class TestShortHash:
         full_hash = "abcdef1234567890"
         short = short_hash(full_hash)
 
-        assert len(short) == 8
-        assert short == "abcdef12"
+        assert len(short) == 12  # Default is 12 for better collision resistance
+        assert short == "abcdef123456"
 
     def test_custom_length(self):
         """Test custom short hash length."""

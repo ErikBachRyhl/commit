@@ -1,6 +1,6 @@
 # Commit
 
-> **Commit to your learning journey** - every git commit becomes lasting knowledge  
+> **Commit to the process - commit to your learning journey** - every git commit becomes lasting knowledge  
 > *commit* = git commit + commitment to learning
 
 > Automatically sync LaTeX notes to Anki flashcards with LLM-powered generation

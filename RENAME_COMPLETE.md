@@ -1,32 +1,32 @@
-# ✅ Rename Complete: AnkiTex → Renforce
+# ✅ Rename Complete: AnkiTex → Commit
 
 ## Summary
 
-Successfully renamed the entire application from **AnkiTex** to **Renforce**!
+Successfully renamed the entire application from **AnkiTex** to **Commit**!
 
-**Repository:** https://github.com/ErikBachRyhl/renforce
+**Repository:** https://github.com/ErikBachRyhl/commit
 
 ---
 
 ## What Was Changed
 
 ### ✅ Package Directory
-- `anki_tex/` → `renforce/`
+- `anki_tex/` → `commit/`
 - All 15 Python modules updated
 
 ### ✅ Package Configuration
 - `pyproject.toml` - package name, scripts, imports
 - `requirements.txt` - (no changes needed)
-- Command: `anki-tex` → `renforce`
+- Command: `anki-tex` → `commit`
 
 ### ✅ Python Imports
 Updated in:
-- All `renforce/` modules (15 files)
+- All `commit/` modules (15 files)
 - `test_llm.py`
 - `test_llm_integration.py`
 - `tests/*.py` (3 files)
 
-All imports changed from `anki_tex` to `renforce`
+All imports changed from `anki_tex` to `commit`
 
 ### ✅ Documentation
 Updated in:
@@ -37,13 +37,13 @@ Updated in:
 - All other `.md` files (20+ files)
 
 ### ✅ Configuration Files
-- `example/anki-tex.yml` → `example/renforce.yml`
+- `example/anki-tex.yml` → `example/commit.yml`
 - Updated all references inside config
 
 ### ✅ Git Repository
 ```bash
 ✓ Initialized git repository
-✓ Added remote: https://github.com/ErikBachRyhl/renforce.git
+✓ Added remote: https://github.com/ErikBachRyhl/commit.git
 ✓ Created initial commit (43 files, 9902 lines)
 ✓ Branch: main
 ✓ Added GitHub Actions CI workflow
@@ -82,19 +82,19 @@ pip install -e .
 ### Basic Commands
 ```bash
 # Process notes
-renforce process --repo /path/to/notes --enable-llm
+commit process --repo /path/to/notes --enable-llm
 
 # With limit for testing
-renforce process --repo /path/to/notes --enable-llm --limit 2
+commit process --repo /path/to/notes --enable-llm --limit 2
 
 # Check stats
-renforce stats
+commit stats
 
 # Check orphans
-renforce check-orphans --repo /path/to/notes
+commit check-orphans --repo /path/to/notes
 
 # Reconcile state
-renforce reconcile-state --repo /path/to/notes
+commit reconcile-state --repo /path/to/notes
 ```
 
 ### Push to GitHub
@@ -120,7 +120,7 @@ git push -u origin main
 ### Config Files in User Repos
 Users need to rename:
 ```bash
-mv anki-tex.yml renforce.yml
+mv anki-tex.yml commit.yml
 ```
 
 But the content stays the same!
@@ -136,13 +136,13 @@ cd /Users/erik/Projects/apps/AnkiChat
 source venv/bin/activate
 
 # Test import
-python -c "from renforce.config import AppConfig; print('✓ Import works')"
+python -c "from commit.config import AppConfig; print('✓ Import works')"
 
 # Test CLI
-python -m renforce.cli --version
+python -m commit.cli --version
 
 # Test with your notes
-python -m renforce.cli process \
+python -m commit.cli process \
   --repo /Users/erik/Documents/Studie/learning \
   --enable-llm \
   --limit 1 \
@@ -156,20 +156,20 @@ python -m renforce.cli process \
 **Total: 50+ files updated**
 
 ### Core Package (15 files)
-- `renforce/__init__.py`
-- `renforce/cli.py`
-- `renforce/config.py`
-- `renforce/processor.py`
-- `renforce/note_models.py`
-- `renforce/tex_parser.py`
-- `renforce/hashing.py`
-- `renforce/git_utils.py`
-- `renforce/state.py`
-- `renforce/anki_connect.py`
-- `renforce/apkg_builder.py`
-- `renforce/llm_client.py`
-- `renforce/prompts.py`
-- `renforce/security.py`
+- `commit/__init__.py`
+- `commit/cli.py`
+- `commit/config.py`
+- `commit/processor.py`
+- `commit/note_models.py`
+- `commit/tex_parser.py`
+- `commit/hashing.py`
+- `commit/git_utils.py`
+- `commit/state.py`
+- `commit/anki_connect.py`
+- `commit/apkg_builder.py`
+- `commit/llm_client.py`
+- `commit/prompts.py`
+- `commit/security.py`
 
 ### Tests (5 files)
 - `test_llm.py`
@@ -184,7 +184,7 @@ python -m renforce.cli process \
 
 ### Configuration (2 files)
 - `pyproject.toml`
-- `example/renforce.yml`
+- `example/commit.yml`
 
 ### Git (3 files)
 - `.gitignore`
@@ -214,7 +214,7 @@ python -m renforce.cli process \
 
 2. ✅ **Test Locally**
    ```bash
-   renforce process --repo /path/to/notes --limit 1 --dry-run
+   commit process --repo /path/to/notes --limit 1 --dry-run
    ```
 
 3. **📤 Push to GitHub**
@@ -225,12 +225,12 @@ python -m renforce.cli process \
 4. **📝 Update Your Notes Repo**
    ```bash
    cd /Users/erik/Documents/Studie/learning
-   mv anki-tex.yml renforce.yml
-   git add renforce.yml
-   git commit -m "Rename config for Renforce"
+   mv anki-tex.yml commit.yml
+   git add commit.yml
+   git commit -m "Rename config for Commit"
    ```
 
-5. **🎉 Enjoy Renforce!**
+5. **🎉 Enjoy Commit!**
 
 ---
 
@@ -238,20 +238,20 @@ python -m renforce.cli process \
 
 - **Documentation:** See `DOCUMENTATION_INDEX.md`
 - **Migration Guide:** See `RENAME.md`
-- **GitHub:** https://github.com/ErikBachRyhl/renforce
+- **GitHub:** https://github.com/ErikBachRyhl/commit
 
 ---
 
 ## The Name
 
-**Renforce** = Reinforce + Enforce + Renforcer (French)
+**Commit** = Reinforce + Enforce + Commitr (French)
 
 A perfect name that captures:
 - **Reinforcing** learning through spaced repetition
 - **Enforcing** consistent study habits
-- **Strengthening** (renforcer) knowledge over time
+- **Strengthening** (commitr) knowledge over time
 
 ---
 
-**Welcome to Renforce! 🚀**
+**Welcome to Commit! 🚀**
 

@@ -11,15 +11,15 @@ from rich import print as rprint
 from . import __version__
 
 app = typer.Typer(
-    name="renforce",
-    help="Renforce - Reinforce concepts from LaTeX notes with intelligent Anki flashcards",
+    name="commit",
+    help="Commit - Commit to your learning journey with intelligent Anki flashcards from LaTeX",
     add_completion=False,
 )
 
 def version_callback(value: bool):
     """Show version and exit."""
     if value:
-        console.print("Renforce version 0.1.0")
+        console.print("Commit version 0.1.0")
         raise typer.Exit()
 
 @app.callback()
@@ -33,7 +33,7 @@ def main(
         help="Show version and exit",
     )
 ):
-    """Renforce - Reinforce concepts from LaTeX notes with intelligent Anki flashcards."""
+    """Commit - Commit to your learning journey with intelligent flashcards."""
     pass
 
 console = Console()

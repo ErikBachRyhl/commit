@@ -71,7 +71,7 @@ def process_repository(
     if not config_path:
         raise ProcessorError(
             f"Config file not found in {repo_path}. "
-            "Create renforce.yml with your course configuration."
+            "Create commit.yml with your course configuration."
         )
 
     try:

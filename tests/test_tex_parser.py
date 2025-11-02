@@ -2,7 +2,7 @@
 
 import pytest
 
-from renforce.tex_parser import (
+from commit.tex_parser import (
     extract_environments,
     normalize_tex,
     extract_metadata,

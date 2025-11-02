@@ -1,10 +1,10 @@
-# Renforce: Complete Overview & Implementation Guide
+# Commit: Complete Overview & Implementation Guide
 
 > **A comprehensive guide to everything we've built, how it works, and how to use it.**
 
 ## 📋 Table of Contents
 
-1. [What is Renforce?](#what-is-ankitex)
+1. [What is Commit?](#what-is-ankitex)
 2. [Core Features](#core-features)
 3. [Architecture Overview](#architecture-overview)
 4. [Key Innovations](#key-innovations)
@@ -17,9 +17,9 @@
 
 ---
 
-## What is Renforce?
+## What is Commit?
 
-**Renforce** is a production-ready command-line tool that automatically converts your LaTeX study notes into Anki flashcards. It's designed for students and researchers who:
+**Commit** is a production-ready command-line tool that automatically converts your LaTeX study notes into Anki flashcards. It's designed for students and researchers who:
 
 - Take notes in LaTeX (definitions, theorems, examples)
 - Want spaced repetition flashcards automatically generated
@@ -81,7 +81,7 @@ A metric space is a set $M$ with a distance function...
 
 **Example:**
 ```latex
-% renforce-guid: abc123def456
+% commit-guid: abc123def456
 \begin{definition}
 ...
 \end{definition}
@@ -137,20 +137,20 @@ State Update (track GUIDs, hashes, commits)
 2. **`processor.py`**: Orchestrates the entire pipeline
 3. **`llm_client.py`**: Provider-agnostic LLM client (OpenAI/Anthropic/Gemini)
 4. **`anki_connect.py`**: HTTP client for AnkiConnect API
-5. **`state.py`**: Manages `~/.renforce_state.json` (tracking, audit logs)
+5. **`state.py`**: Manages `~/.commit_state.json` (tracking, audit logs)
 6. **`hashing.py`**: GUID generation and content hashing
-7. **`config.py`**: Loads and validates `renforce.yml`
+7. **`config.py`**: Loads and validates `commit.yml`
 
 ### Data Flow
 
 ```
 Git Repo
   ├── .tex files (with GUID comments)
-  └── renforce.yml (config)
+  └── commit.yml (config)
 
        ↓
 
-Renforce Processing
+Commit Processing
   ├── Extract environments
   ├── Match GUIDs (short → full)
   ├── Generate cards (basic or LLM)
@@ -165,7 +165,7 @@ Anki (via AnkiConnect)
 
        ↓
 
-State File (~/.renforce_state.json)
+State File (~/.commit_state.json)
   ├── last_processed_sha
   ├── note_hashes (GUID → Anki ID mapping)
   └── llm_generations (audit log)
@@ -258,7 +258,7 @@ pip install openai anthropic google-generativeai python-dotenv
 
 ### Create Configuration
 
-Create `renforce.yml` in your repository root:
+Create `commit.yml` in your repository root:
 
 ```yaml
 courses:
@@ -330,7 +330,7 @@ GEMINI_API_KEY=your-key-here
    ```bash
    cd /Users/erik/Projects/apps/AnkiChat
    source venv/bin/activate
-   python -m renforce.cli process --repo /path/to/notes
+   python -m commit.cli process --repo /path/to/notes
    ```
 
 4. **Review in Anki:**
@@ -342,30 +342,30 @@ GEMINI_API_KEY=your-key-here
 
 ```bash
 # Preview what will be created (no changes)
-python -m renforce.cli process --repo /path/to/notes --dry-run
+python -m commit.cli process --repo /path/to/notes --dry-run
 
 # Process with LLM enabled
-python -m renforce.cli process --repo /path/to/notes --enable-llm
+python -m commit.cli process --repo /path/to/notes --enable-llm
 
 # Process from specific commit
-python -m renforce.cli process --repo /path/to/notes --since abc123
+python -m commit.cli process --repo /path/to/notes --since abc123
 
 # Generate offline .apkg file
-python -m renforce.cli process --repo /path/to/notes --offline --output notes.apkg
+python -m commit.cli process --repo /path/to/notes --offline --output notes.apkg
 
 # Check for orphaned cards
-python -m renforce.cli check-orphans --repo /path/to/notes
+python -m commit.cli check-orphans --repo /path/to/notes
 
 # View statistics
-python -m renforce.cli stats
+python -m commit.cli stats
 
 # Rebuild state from Anki (if lost)
-python -m renforce.cli sync-state --repo /path/to/notes
+python -m commit.cli sync-state --repo /path/to/notes
 ```
 
 ### LLM Configuration
 
-**In `renforce.yml`:**
+**In `commit.yml`:**
 ```yaml
 llm:
   provider: openai           # openai | anthropic | gemini | none
@@ -393,7 +393,7 @@ llm:
 
 **Automatic injection:**
 - GUIDs are automatically injected when creating new cards
-- Appear as comments: `% renforce-guid: abc123def456`
+- Appear as comments: `% commit-guid: abc123def456`
 
 **Manual management:**
 - GUIDs are just comments - you can move/edit them
@@ -407,7 +407,7 @@ llm:
 ### 2. Orphaned Card Detection
 
 ```bash
-python -m renforce.cli check-orphans --repo /path/to/notes
+python -m commit.cli check-orphans --repo /path/to/notes
 ```
 
 **What it does:**
@@ -430,7 +430,7 @@ nid:123456,789012,345678
 When you edit a definition:
 
 ```latex
-% renforce-guid: abc123def456
+% commit-guid: abc123def456
 \begin{definition}[Group]
 A group is a set $G$ with a binary operation $\cdot$...
 %                    ^ You added notation
@@ -568,7 +568,7 @@ A metric space is a set $M$ with a distance function...
 ### Core Code
 
 ```
-renforce/
+commit/
 ├── cli.py              # CLI interface (Typer)
 ├── processor.py        # Main orchestration
 ├── config.py           # Configuration loading/validation
@@ -599,7 +599,7 @@ renforce/
 
 ### Example Files
 
-- `example/renforce.yml` - Sample configuration
+- `example/commit.yml` - Sample configuration
 - `example/samples.tex` - Sample LaTeX with environments
 
 ---
@@ -614,7 +614,7 @@ renforce/
 - Interactive Q&A sessions over Git diffs
 - Socratic method quizzing
 - Card proposals during chat
-- `renforce chat` command
+- `commit chat` command
 
 **Current workaround:**
 - Use ChatGPT/Claude manually with git diffs
@@ -641,25 +641,25 @@ renforce/
 
 ```bash
 # Process notes (with LLM)
-python -m renforce.cli process --repo /path/to/notes --enable-llm
+python -m commit.cli process --repo /path/to/notes --enable-llm
 
 # Preview first (always recommended)
-python -m renforce.cli process --repo /path/to/notes --dry-run
+python -m commit.cli process --repo /path/to/notes --dry-run
 
 # Check for orphaned cards
-python -m renforce.cli check-orphans --repo /path/to/notes
+python -m commit.cli check-orphans --repo /path/to/notes
 
 # Reconcile state with Anki (when decks deleted, etc.)
-python -m renforce.cli reconcile-state --repo /path/to/notes
+python -m commit.cli reconcile-state --repo /path/to/notes
 
 # Rebuild state from Anki (if state file lost)
-python -m renforce.cli sync-state --repo /path/to/notes
+python -m commit.cli sync-state --repo /path/to/notes
 ```
 
 ### Configuration Locations
 
-- **Config:** `renforce.yml` (in your notes repo)
-- **State:** `~/.renforce_state.json`
+- **Config:** `commit.yml` (in your notes repo)
+- **State:** `~/.commit_state.json`
 - **API Keys:** `.env` (in project root)
 - **GUIDs:** In LaTeX source files (as comments)
 
@@ -673,7 +673,7 @@ python -m renforce.cli sync-state --repo /path/to/notes
 
 ## Summary
 
-**Renforce** is a production-ready tool that:
+**Commit** is a production-ready tool that:
 
 ✅ **Automatically converts LaTeX notes to Anki cards**  
 ✅ **Preserves review history when you edit notes** (GUID persistence)  

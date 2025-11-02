@@ -26,5 +26,5 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest tests/ -v --cov=renforce --cov-report=term-missing
+        pytest tests/ -v --cov=commit --cov-report=term-missing
 

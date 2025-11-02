@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from renforce.git_utils import (
+from commit.git_utils import (
     GitError,
     get_repo,
     _filter_by_patterns,

@@ -12,7 +12,7 @@
 
 **Problem:** Test expected `GitError` but got `NoSuchPathError` for invalid paths
 
-**Fixed in `renforce/git_utils.py`:**
+**Fixed in `commit/git_utils.py`:**
 ```python
 # Added import
 from git.exc import NoSuchPathError
@@ -89,13 +89,13 @@ git add example/
 
 ```
 375569e Fix CI test failures
-99958bc Fix config.py to look for renforce.yml
-19c46eb Update config file name from anki-tex.yml to renforce.yml
+99958bc Fix config.py to look for commit.yml
+19c46eb Update config file name from anki-tex.yml to commit.yml
 1649197 Fix CLI version flag and update .gitignore
 a938455 Add comprehensive rename completion guide
 0e8ac84 Add GitHub Actions CI workflow
 b07c8c5 Add RENAME.md guide and update README branding
-198a946 Initial commit: Renforce
+198a946 Initial commit: Commit
 ```
 
 **8 commits ready to push!**
@@ -116,7 +116,7 @@ git push -u origin main
 ## What Changed
 
 ### Files Modified:
-1. **`renforce/git_utils.py`**
+1. **`commit/git_utils.py`**
    - Added `NoSuchPathError` import
    - Added exception handling in `get_repo()`
 

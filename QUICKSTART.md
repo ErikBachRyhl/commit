@@ -18,7 +18,7 @@
 1. **Create a test repository** (or use existing LaTeX notes):
    ```bash
    # Copy example files to your notes directory
-   cp example/renforce.yml /path/to/your/notes/
+   cp example/commit.yml /path/to/your/notes/
    cp example/samples.tex /path/to/your/notes/test.tex
    ```
 
@@ -33,12 +33,12 @@
 3. **Test with dry-run**:
    ```bash
    cd /Users/erik/Projects/apps/AnkiChat
-   python -m renforce.cli process --repo /path/to/your/notes --dry-run
+   python -m commit.cli process --repo /path/to/your/notes --dry-run
    ```
 
 4. **Sync to Anki** (make sure Anki is running):
    ```bash
-   python -m renforce.cli process --repo /path/to/your/notes
+   python -m commit.cli process --repo /path/to/your/notes
    ```
 
 ## Example Workflow
@@ -64,7 +64,7 @@
 
 3. **Sync to Anki**:
    ```bash
-   python -m renforce.cli process --repo .
+   python -m commit.cli process --repo .
    ```
 
 4. **Review in Anki**:
@@ -76,13 +76,13 @@
 
 - **Use `--dry-run`** first to preview what will be created
 - **Check tags** in Anki to find notes by commit, file, or environment type
-- **Update notes** by editing the LaTeX and committing - Renforce will update existing cards
+- **Update notes** by editing the LaTeX and committing - Commit will update existing cards
 - **Offline mode** with `--offline` if you want to manually import the .apkg file
 
 ## Troubleshooting
 
 ### "Config file not found"
-Make sure `renforce.yml` exists in your repository root.
+Make sure `commit.yml` exists in your repository root.
 
 ### "Cannot connect to AnkiConnect"
 - Verify Anki is running
@@ -91,12 +91,12 @@ Make sure `renforce.yml` exists in your repository root.
 
 ### "No .tex files changed"
 - Make sure you've committed your changes
-- Check that file paths match patterns in `renforce.yml`
+- Check that file paths match patterns in `commit.yml`
 
 ## Next Steps
 
-- Customize `renforce.yml` for your courses
+- Customize `commit.yml` for your courses
 - Add custom LaTeX environments to `envs_to_extract`
-- Run `python -m renforce.cli stats` to see tracked notes
-- Check `~/.renforce_state.json` to see what's been processed
+- Run `python -m commit.cli stats` to see tracked notes
+- Check `~/.commit_state.json` to see what's been processed
 

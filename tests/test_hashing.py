@@ -2,7 +2,7 @@
 
 import pytest
 
-from renforce.hashing import (
+from commit.hashing import (
     compute_guid,
     compute_content_hash,
     short_hash,

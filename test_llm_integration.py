@@ -21,7 +21,7 @@ import subprocess
 # Add anki_tex to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from renforce.processor import process_repository
+from commit.processor import process_repository
 from rich.console import Console
 from rich.table import Table
 

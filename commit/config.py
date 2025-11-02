@@ -214,7 +214,7 @@ def load_config(config_path: Path) -> AppConfig:
     Load and validate configuration from YAML file.
 
     Args:
-        config_path: Path to renforce.yml
+        config_path: Path to commit.yml
 
     Returns:
         Validated AppConfig instance
@@ -238,7 +238,7 @@ def load_config(config_path: Path) -> AppConfig:
 
 def find_config(repo_path: Path) -> Optional[Path]:
     """
-    Find renforce.yml in repository (supports legacy anki-tex.yml too).
+    Find commit.yml in repository (supports legacy names too).
 
     Args:
         repo_path: Root directory of the repository
@@ -247,10 +247,13 @@ def find_config(repo_path: Path) -> Optional[Path]:
         Path to config file, or None if not found
     """
     candidates = [
+        repo_path / "commit.yml",
+        repo_path / "commit.yaml",
+        repo_path / ".commit.yml",
+        # Legacy support for old config names
         repo_path / "renforce.yml",
         repo_path / "renforce.yaml",
         repo_path / ".renforce.yml",
-        # Legacy support for old config names
         repo_path / "anki-tex.yml",
         repo_path / "anki-tex.yaml",
         repo_path / ".anki-tex.yml",

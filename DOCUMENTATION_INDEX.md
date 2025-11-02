@@ -1,6 +1,6 @@
 # Documentation Index
 
-Quick reference for all Renforce documentation.
+Quick reference for all Commit documentation.
 
 ## 📚 Start Here
 
@@ -83,7 +83,7 @@ Quick reference for all Renforce documentation.
 
 ## 📖 Reference
 
-- **Config Example:** `example/renforce.yml`
+- **Config Example:** `example/commit.yml`
 - **LaTeX Example:** `example/samples.tex`
 - **API Keys Template:** `env.example`
 

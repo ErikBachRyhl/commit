@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "renforce"
+name = "commit"
 version = "0.1.0"
-description = "Reinforce concepts from LaTeX notes with intelligent Anki flashcards"
+description = "Commit to your learning journey - convert LaTeX notes to intelligent Anki flashcards"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
@@ -28,8 +28,8 @@ dev = [
 ]
 
 [project.scripts]
-renforce = "renforce.cli:app"
+commit = "commit.cli:app"
 
 [tool.setuptools.packages.find]
-include = ["renforce*"]
+include = ["commit*"]
 

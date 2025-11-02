@@ -20,10 +20,10 @@ import sys
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from renforce.llm_client import create_llm_client, LLMError
-from renforce.prompts import format_cards_prompt, CARDS_SYSTEM_PROMPT
-from renforce.security import strip_dangerous_latex, is_safe_latex
-from renforce.config import get_api_key
+from commit.llm_client import create_llm_client, LLMError
+from commit.prompts import format_cards_prompt, CARDS_SYSTEM_PROMPT
+from commit.security import strip_dangerous_latex, is_safe_latex
+from commit.config import get_api_key
 
 
 def test_security():

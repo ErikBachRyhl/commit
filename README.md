@@ -1,11 +1,11 @@
-# Renforce
+# Commit
 
 > **Reinforce** concepts from LaTeX notes with intelligent Anki flashcards  
-> *renforce* = reinforce + enforce + renforcer (French: to strengthen)
+> *commit* = reinforce + enforce + commitr (French: to strengthen)
 
 > Automatically sync LaTeX notes to Anki flashcards with LLM-powered generation
 
-Renforce is a production-ready command-line tool that monitors your Git repository of LaTeX notes, extracts structured content (definitions, theorems, propositions, examples), and automatically generates high-quality Anki flashcards. Now with optional LLM-powered card generation for active recall and permanent GUID tracking to preserve review history.
+Commit is a production-ready command-line tool that monitors your Git repository of LaTeX notes, extracts structured content (definitions, theorems, propositions, examples), and automatically generates high-quality Anki flashcards. Now with optional LLM-powered card generation for active recall and permanent GUID tracking to preserve review history.
 
 **📚 New here?** Start with [`COMPLETE_OVERVIEW.md`](COMPLETE_OVERVIEW.md) - comprehensive guide to everything!
 
@@ -72,7 +72,7 @@ Install the [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on in 
 
 ### 2. Create Configuration File
 
-Create `renforce.yml` in your repository root:
+Create `commit.yml` in your repository root:
 
 ```yaml
 courses:
@@ -110,17 +110,17 @@ tags:
   - file:{file}
 ```
 
-### 3. Run Renforce
+### 3. Run Commit
 
 ```bash
 # Process changes and sync to Anki
-python -m renforce.cli process --repo .
+python -m commit.cli process --repo .
 
 # Dry run (preview without syncing)
-python -m renforce.cli process --repo . --dry-run
+python -m commit.cli process --repo . --dry-run
 
 # Offline mode (generate .apkg file)
-python -m renforce.cli process --repo . --offline --output dist/notes.apkg
+python -m commit.cli process --repo . --offline --output dist/notes.apkg
 ```
 
 ## Usage
@@ -132,7 +132,7 @@ python -m renforce.cli process --repo . --offline --output dist/notes.apkg
 Main command to process LaTeX notes and sync to Anki.
 
 ```bash
-python -m renforce.cli process [OPTIONS]
+python -m commit.cli process [OPTIONS]
 
 Options:
   --repo, -r PATH         Path to Git repository (default: current directory)
@@ -147,7 +147,7 @@ Options:
 Manually set the last processed commit SHA.
 
 ```bash
-python -m renforce.cli set-since <SHA>
+python -m commit.cli set-since <SHA>
 ```
 
 #### `clear-cache`
@@ -155,7 +155,7 @@ python -m renforce.cli set-since <SHA>
 Clear the state cache (WARNING: may create duplicates).
 
 ```bash
-python -m renforce.cli clear-cache [--force]
+python -m commit.cli clear-cache [--force]
 ```
 
 #### `stats`
@@ -163,7 +163,7 @@ python -m renforce.cli clear-cache [--force]
 Display statistics about tracked notes.
 
 ```bash
-python -m renforce.cli stats
+python -m commit.cli stats
 ```
 
 #### `reconcile-state`
@@ -176,10 +176,10 @@ Use when:
 - Need to verify tracking is correct
 
 ```bash
-python -m renforce.cli reconcile-state --repo /path/to/notes
+python -m commit.cli reconcile-state --repo /path/to/notes
 
 # Non-interactive (just show differences)
-python -m renforce.cli reconcile-state --repo /path/to/notes --force
+python -m commit.cli reconcile-state --repo /path/to/notes --force
 ```
 
 See [`STATE_RECONCILIATION.md`](STATE_RECONCILIATION.md) for detailed guide.
@@ -193,7 +193,7 @@ Use when:
 - Need to rebuild tracking from existing Anki cards
 
 ```bash
-python -m renforce.cli sync-state --repo /path/to/notes
+python -m commit.cli sync-state --repo /path/to/notes
 ```
 
 #### `check-orphans`
@@ -201,7 +201,7 @@ python -m renforce.cli sync-state --repo /path/to/notes
 Check for orphaned cards (cards in Anki but not in current LaTeX files).
 
 ```bash
-python -m renforce.cli check-orphans --repo /path/to/notes
+python -m commit.cli check-orphans --repo /path/to/notes
 ```
 
 #### `version`
@@ -209,7 +209,7 @@ python -m renforce.cli check-orphans --repo /path/to/notes
 Display version information.
 
 ```bash
-python -m renforce.cli version
+python -m commit.cli version
 ```
 
 ## Configuration
@@ -249,7 +249,7 @@ Tags are automatically generated from templates:
 
 ## LaTeX Format
 
-Renforce recognizes standard LaTeX environments:
+Commit recognizes standard LaTeX environments:
 
 ```latex
 \begin{definition}[Optional Title]
@@ -292,7 +292,7 @@ Let $X = \mathbb{R}^2$ with the Euclidean metric...
 
 ## State Management
 
-Renforce maintains state in `~/.renforce_state.json`:
+Commit maintains state in `~/.commit_state.json`:
 
 ```json
 {
@@ -311,7 +311,7 @@ Renforce maintains state in `~/.renforce_state.json`:
 
 ## Idempotence
 
-Renforce ensures idempotent operations:
+Commit ensures idempotent operations:
 
 - **Same content**: Uses GUID based on `env_name|body|file_path`
 - **Content changes**: Updates existing note, adds `rev:YYYYMMDD` tag
@@ -367,8 +367,8 @@ pytest tests/
 ### Project Structure
 
 ```
-renforce/
-├── renforce/
+commit/
+├── commit/
 │   ├── __init__.py
 │   ├── cli.py              # CLI interface
 │   ├── processor.py        # Main processing logic
@@ -385,7 +385,7 @@ renforce/
 │   ├── test_hashing.py
 │   └── test_git_utils.py
 ├── example/
-│   ├── renforce.yml
+│   ├── commit.yml
 │   └── samples.tex
 ├── pyproject.toml
 ├── requirements.txt

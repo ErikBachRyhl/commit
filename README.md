@@ -1,7 +1,7 @@
 # Commit
 
-> **Reinforce** concepts from LaTeX notes with intelligent Anki flashcards  
-> *commit* = reinforce + enforce + commitr (French: to strengthen)
+> **Commit to your learning journey** - every git commit becomes lasting knowledge  
+> *commit* = git commit + commitment to learning
 
 > Automatically sync LaTeX notes to Anki flashcards with LLM-powered generation
 

@@ -321,4 +321,12 @@ class SyncAnkiConnectClient:
     def get_deck_names(self) -> List[str]:
         """Get list of all deck names."""
         return self._run_async(self.client.get_deck_names())
+    
+    def notes_info(self, note_ids: List[int]) -> List[Dict]:
+        """Get information about notes."""
+        return self._run_async(self.client.notes_info(note_ids))
+    
+    def delete_notes(self, note_ids: List[int]) -> None:
+        """Delete notes from Anki."""
+        return self._run_async(self.client.delete_notes(note_ids))
 

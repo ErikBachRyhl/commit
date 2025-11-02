@@ -12,8 +12,8 @@ from .apkg_builder import APKGBuilderError, build_apkg, is_genanki_available
 from .config import find_config, load_config
 from .git_utils import GitError, get_changed_files, get_current_sha
 from .llm_client import LLMClient, create_llm_client
-from .note_models import AnkiNote, ExtractedBlock, NoteMapper, create_revision_tag
-from .prompts import CARDS_SYSTEM_PROMPT
+from .note_models import AnkiNote, ExtractedBlock, NoteMapper, create_revision_tag, validate_card_content
+from .prompts import CARDS_SYSTEM_PROMPT, BATCH_CARDS_SYSTEM_PROMPT
 from .security import strip_dangerous_latex
 from .state import StateManager
 from .tex_parser import extract_environments, extract_neighbor_context, inject_guid_comment
@@ -267,50 +267,63 @@ def process_repository(
     anki_notes: List[AnkiNote] = []
     note_actions: List[Dict] = []
 
-    for course_name, blocks in course_blocks.items():
-        course_config = config.courses[course_name]
-        deck_name = course_config.deck
-
-        mapper = NoteMapper(course_name, current_sha)
-
-        for block in blocks:
-            # Generate notes using LLM or basic mapper
-            if use_llm and llm_client:
-                # Use LLM to generate multiple cards per block
-                generated_notes = _generate_cards_with_llm(
-                    block, course_name, deck_name, llm_client, config, state
-                )
-                
-                if not generated_notes:
-                    # Fallback to basic mapping if LLM fails
-                    console.print(f"[dim]  Falling back to basic mapping for {block.file_path}:{block.line_number}[/dim]")
-                    generated_notes = [mapper.map_block(block, deck_name)]
-                
-                # Process each generated note
-                for note in generated_notes:
-                    # For LLM cards, we check the combined GUID
-                    note_guid = note.guid
-                    
-                    # Check if note exists and has changed
-                    if state.is_note_seen(note_guid):
-                        if state.has_note_changed(note_guid, block.content_hash):
-                            action = "update"
-                            stats["notes_updated"] += 1
-                        else:
-                            action = "skip"
-                            stats["notes_skipped"] += 1
-                    else:
-                        action = "create"
-                        stats["notes_created"] += 1
-                    
-                    anki_notes.append(note)
-                    note_actions.append({
-                        "note": note,
-                        "action": action,
-                        "block": block,
-                    })
+    if use_llm and llm_client:
+        # BATCH PROCESSING MODE: Process all blocks at once with LLM
+        # Collect all blocks with metadata
+        all_blocks_with_meta = []
+        for course_name, blocks in course_blocks.items():
+            course_config = config.courses[course_name]
+            deck_name = course_config.deck
+            priority = config.priorities.get(course_name, 1)
+            
+            for block in blocks:
+                all_blocks_with_meta.append({
+                    "block": block,
+                    "course": course_name,
+                    "priority": priority,
+                    "deck": deck_name
+                })
+        
+        # Call batch generation function
+        note_actions = _generate_cards_batch_with_llm(
+            all_blocks_with_meta,
+            llm_client,
+            config,
+            state,
+            current_sha
+        )
+        
+        # Update stats
+        for na in note_actions:
+            action = na["action"]
+            block = na["block"]
+            note = na["note"]
+            
+            if action == "create":
+                stats["notes_created"] += 1
+            elif action == "update":
+                stats["notes_updated"] += 1
             else:
-                # Basic mapping (no LLM)
+                stats["notes_skipped"] += 1
+            
+            anki_notes.append(note)
+            
+            stats["notes"].append({
+                "env": block.env,
+                "preview": block.title or block.normalized_body[:50],
+                "file": block.file_path,
+                "line": block.line_number,
+                "action": "llm-batch"
+            })
+    
+    else:
+        # BASIC MODE: Process blocks one at a time without LLM
+        for course_name, blocks in course_blocks.items():
+            course_config = config.courses[course_name]
+            deck_name = course_config.deck
+            mapper = NoteMapper(course_name, current_sha)
+
+            for block in blocks:
                 # Check if note exists and has changed
                 if state.is_note_seen(block.guid):
                     if state.has_note_changed(block.guid, block.content_hash):
@@ -334,13 +347,13 @@ def process_repository(
                     "block": block,
                 })
 
-            stats["notes"].append({
-                "env": block.env,
-                "preview": block.title or block.normalized_body[:50],
-                "file": block.file_path,
-                "line": block.line_number,
-                "action": action if not use_llm else "llm",
-            })
+                stats["notes"].append({
+                    "env": block.env,
+                    "preview": block.title or block.normalized_body[:50],
+                    "file": block.file_path,
+                    "line": block.line_number,
+                    "action": "basic"
+                })
 
     # Step 6: Sync to Anki (if not dry-run)
     if dry_run:
@@ -420,14 +433,16 @@ def process_repository(
 
                 if action == "create":
                     # Validate note before sending to AnkiConnect
-                    front = note.fields.get("Front", "").strip()
-                    back = note.fields.get("Back", "").strip()
+                    front = note.fields.get("Front", "")
+                    back = note.fields.get("Back", "")
                     
-                    if not front or (note.model_name == "Basic" and not back):
-                        console.print(f"[yellow]  Warning: Skipping empty note from {block.file_path}:{block.line_number}[/yellow]")
-                        console.print(f"[yellow]    Front: '{front[:50]}' Back: '{back[:50]}'[/yellow]")
+                    is_valid, error_msg = validate_card_content(front, back, note.model_name)
+                    if not is_valid:
+                        console.print(f"[yellow]  Warning: Skipping invalid note from {block.file_path}:{block.line_number}[/yellow]")
+                        console.print(f"[yellow]    Reason: {error_msg}[/yellow]")
+                        console.print(f"[yellow]    Front: '{front[:50]}...' Back: '{back[:50]}...'[/yellow]")
                         stats["warnings"].append(
-                            f"Skipped empty note: {block.file_path}:{block.line_number}"
+                            f"Skipped invalid note ({error_msg}): {block.file_path}:{block.line_number}"
                         )
                         continue
                     
@@ -636,6 +651,213 @@ def _generate_cards_with_llm(
     except Exception as e:
         console.print(f"[yellow]LLM generation failed for {block.file_path}:{block.line_number}: {e}[/yellow]")
         return []
+
+
+def _create_anki_note_from_card(
+    card: Dict,
+    block: ExtractedBlock,
+    course_name: str,
+    deck_name: str
+) -> Optional[AnkiNote]:
+    """
+    Create an AnkiNote from a card dict generated by LLM.
+    
+    Args:
+        card: Dict with model, front, back, tags
+        block: The source block
+        course_name: Course name
+        deck_name: Deck name
+    
+    Returns:
+        AnkiNote or None if invalid
+    """
+    from .hashing import compute_content_hash, compute_guid
+    
+    model_name = card.get("model", "Basic")
+    front = card.get("front", "").strip()
+    back = card.get("back", "").strip()
+    tags = card.get("tags", [])
+    
+    # Validate card content
+    is_valid, error_msg = validate_card_content(front, back, model_name)
+    if not is_valid:
+        console.print(f"[yellow]  Skipping invalid card: {error_msg}[/yellow]")
+        return None
+    
+    # Add standard tags
+    if "auto" not in tags:
+        tags.append("auto")
+    if "from-tex" not in tags:
+        tags.append("from-tex")
+    tags.append(f"course:{course_name}")
+    tags.append(f"file:{block.file_path.split('/')[0]}")
+    
+    # Create stable GUID based on card content
+    card_content = f"{front}|{back}"
+    content_hash = compute_content_hash(card_content)
+    note_guid = compute_guid(
+        env_name=f"{block.env}::llm",
+        normalized_body=card_content,
+        file_path=block.file_path
+    )
+    
+    return AnkiNote(
+        guid=note_guid,
+        model_name=model_name,
+        deck_name=deck_name,
+        fields={"Front": front, "Back": back},
+        tags=tags,
+        content_hash=content_hash,
+    )
+
+
+def _generate_cards_batch_with_llm(
+    blocks_with_meta: List[Dict],
+    llm_client: LLMClient,
+    config,
+    state: StateManager,
+    current_sha: str
+) -> List[Dict]:
+    """
+    Generate cards from multiple blocks in batch mode.
+    LLM sees all blocks and decides which deserve cards based on quality and priorities.
+    
+    Args:
+        blocks_with_meta: List of dicts with block, course, priority, deck
+        llm_client: LLM client
+        config: App config
+        state: State manager
+        current_sha: Current commit SHA
+    
+    Returns:
+        List of note action dicts with note, action, block
+    """
+    if not blocks_with_meta:
+        return []
+    
+    console.print(f"[cyan]Processing {len(blocks_with_meta)} blocks in batch mode...[/cyan]")
+    
+    # Build batch payload
+    batch_payload = {
+        "blocks": [],
+        "priorities": {},
+        "daily_limit": config.daily_new_limit,
+        "constraints": {
+            "max_cards_per_block": config.llm.max_cards_per_block,
+            "paraphrase_strength": config.llm.paraphrase_strength,
+        }
+    }
+    
+    for i, meta in enumerate(blocks_with_meta):
+        block = meta["block"]
+        batch_payload["blocks"].append({
+            "index": i,
+            "course": meta["course"],
+            "priority": meta["priority"],
+            "env": block.env,
+            "title": block.title or "",
+            "body": strip_dangerous_latex(block.body)[:2000],  # Truncate very long blocks
+            "file": block.file_path,
+            "line": block.line_number,
+            "neighbor_context": strip_dangerous_latex(block.neighbor_context or "")[:1000]
+        })
+        batch_payload["priorities"][meta["course"]] = meta["priority"]
+    
+    # Format batch prompt
+    system_prompt = BATCH_CARDS_SYSTEM_PROMPT.format(
+        total_blocks=len(blocks_with_meta),
+        daily_limit=config.daily_new_limit,
+        max_cards_per_block=config.llm.max_cards_per_block,
+        paraphrase_strength=config.llm.paraphrase_strength
+    )
+    
+    # Call LLM
+    try:
+        response = llm_client.generate_cards_batch(system_prompt, batch_payload)
+        
+        # Log response for audit
+        state.record_llm_generation(
+            guid=f"batch_{current_sha}",
+            response=response,
+            model=config.llm.model,
+            provider=config.llm.provider,
+        )
+        
+        # Parse response and create AnkiNotes
+        note_actions = []
+        selected_blocks = response.get("selected_blocks", [])
+        skipped_blocks = response.get("skipped_blocks", [])
+        
+        console.print(f"[green]✓ LLM selected {len(selected_blocks)} blocks, skipped {len(skipped_blocks)}[/green]")
+        
+        for selected in selected_blocks:
+            block_idx = selected.get("block_index")
+            if block_idx is None or block_idx >= len(blocks_with_meta):
+                continue
+                
+            meta = blocks_with_meta[block_idx]
+            block = meta["block"]
+            
+            console.print(f"[dim]  ✓ Block {block_idx}: {block.file_path}:{block.line_number} ({selected.get('reasoning', 'No reason')})[/dim]")
+            
+            for card in selected.get("cards", []):
+                note = _create_anki_note_from_card(
+                    card, block, meta["course"], meta["deck"]
+                )
+                if note:
+                    # Check if note already exists to determine action
+                    if state.is_note_seen(note.guid):
+                        if state.has_note_changed(note.guid, note.content_hash):
+                            action = "update"
+                        else:
+                            action = "skip"
+                    else:
+                        action = "create"
+                    
+                    note_actions.append({
+                        "note": note,
+                        "action": action,
+                        "block": block
+                    })
+        
+        # Log skipped blocks
+        for skipped in skipped_blocks:
+            block_idx = skipped.get("block_index")
+            reasoning = skipped.get("reasoning", "No reason provided")
+            if block_idx is not None and block_idx < len(blocks_with_meta):
+                meta = blocks_with_meta[block_idx]
+                block = meta["block"]
+                console.print(f"[dim]  Skipped block {block_idx}: {block.file_path}:{block.line_number} - {reasoning}[/dim]")
+        
+        # Show summary if available
+        summary = response.get("summary", {})
+        if summary:
+            console.print(f"\n[cyan]Batch Summary:[/cyan]")
+            console.print(f"  Total blocks: {summary.get('total_blocks', len(blocks_with_meta))}")
+            console.print(f"  Selected: {summary.get('selected_count', len(selected_blocks))}")
+            console.print(f"  Cards generated: {summary.get('total_cards', len(note_actions))}")
+            console.print(f"  Daily limit: {summary.get('daily_limit', config.daily_new_limit)}")
+            if summary.get('quality_threshold_met'):
+                console.print(f"  [green]✓ Quality threshold maintained[/green]")
+        
+        return note_actions
+        
+    except Exception as e:
+        console.print(f"[yellow]Batch LLM failed: {e}. Falling back to basic mapping.[/yellow]")
+        # Fallback: create basic cards for all blocks
+        note_actions = []
+        mapper = NoteMapper("", current_sha)  # Temporary mapper
+        
+        for meta in blocks_with_meta:
+            block = meta["block"]
+            note = mapper.map_block(block, meta["deck"])
+            note_actions.append({
+                "note": note,
+                "action": "create" if not state.is_note_seen(note.guid) else "skip",
+                "block": block
+            })
+        
+        return note_actions
 
 
 def _match_file_to_course(file_path: str, courses: Dict) -> Optional[str]:

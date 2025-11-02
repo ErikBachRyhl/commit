@@ -77,9 +77,119 @@ class LLMClient(ABC):
         except Exception as e:
             raise LLMError(f"Chat error: {e}") from e
 
+    def generate_cards_batch(self, system_prompt: str, batch_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate cards from multiple blocks in batch mode.
+        
+        Args:
+            system_prompt: System instruction for batch processing
+            batch_payload: Dict with blocks, priorities, daily_limit, constraints
+        
+        Returns:
+            Dict with selected_blocks, skipped_blocks, summary
+        """
+        try:
+            # Convert batch payload to formatted JSON string for user message
+            user_message = json.dumps(batch_payload, indent=2)
+            
+            # Call API
+            response_text = self._call_api(system_prompt, user_message)
+            
+            # Parse batch response
+            return self._parse_batch_response(response_text)
+        except Exception as e:
+            raise LLMError(f"Batch generation error: {e}") from e
+
+    def _parse_batch_response(self, response_text: str) -> Dict[str, Any]:
+        """
+        Parse batch response JSON from LLM.
+        
+        Expected format:
+        {
+          "selected_blocks": [...],
+          "skipped_blocks": [...],
+          "summary": {...}
+        }
+        
+        Args:
+            response_text: Raw text from model
+        
+        Returns:
+            Dict with selected_blocks and skipped_blocks
+        """
+        original_text = response_text
+        
+        # Strategy 1: Direct parse
+        try:
+            data = json.loads(response_text)
+            if isinstance(data, dict):
+                # Ensure required keys exist
+                if "selected_blocks" not in data:
+                    data["selected_blocks"] = []
+                if "skipped_blocks" not in data:
+                    data["skipped_blocks"] = []
+                return data
+        except json.JSONDecodeError:
+            pass
+
+        # Strategy 2: Extract from markdown code blocks
+        code_block_patterns = [
+            r'```json\s*(\{.*?\})\s*```',
+            r'```\s*(\{.*?\})\s*```',
+            r'```json\s*([\s\S]*?)\s*```',
+            r'```\s*([\s\S]*?)\s*```',
+        ]
+        
+        for pattern in code_block_patterns:
+            match = re.search(pattern, response_text, re.DOTALL)
+            if match:
+                extracted = match.group(1).strip()
+                try:
+                    data = json.loads(extracted)
+                    if isinstance(data, dict):
+                        if "selected_blocks" not in data:
+                            data["selected_blocks"] = []
+                        if "skipped_blocks" not in data:
+                            data["skipped_blocks"] = []
+                        return data
+                except json.JSONDecodeError:
+                    continue
+
+        # Strategy 3: Find JSON object by matching braces
+        start = response_text.find('{')
+        if start >= 0:
+            depth = 0
+            for i in range(start, len(response_text)):
+                if response_text[i] == '{':
+                    depth += 1
+                elif response_text[i] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        json_str = response_text[start:i+1]
+                        try:
+                            data = json.loads(json_str)
+                            if isinstance(data, dict):
+                                if "selected_blocks" not in data:
+                                    data["selected_blocks"] = []
+                                if "skipped_blocks" not in data:
+                                    data["skipped_blocks"] = []
+                                return data
+                        except json.JSONDecodeError:
+                            break
+
+        # All strategies failed - return empty structure
+        print(f"Warning: Could not parse batch response from LLM")
+        print(f"Response preview: {original_text[:300]}...")
+        return {"selected_blocks": [], "skipped_blocks": []}
+
     def _parse_json_response(self, response_text: str) -> List[Dict[str, Any]]:
         """
-        Parse JSON from LLM response, with error recovery.
+        Parse JSON from LLM response, with multiple fallback strategies.
+        
+        Handles common issues:
+        - Markdown code blocks wrapping JSON
+        - Extra text before/after JSON
+        - LaTeX escaping inconsistencies
 
         Args:
             response_text: Raw text from model
@@ -87,36 +197,58 @@ class LLMClient(ABC):
         Returns:
             List of card dictionaries
         """
-        # Try direct parse first
+        original_text = response_text
+        
+        # Strategy 1: Direct parse
         try:
             data = json.loads(response_text)
             if isinstance(data, dict) and "cards" in data:
                 return data["cards"]
             return []
-        except json.JSONDecodeError as e:
-            # JSON parsing failed - might be LaTeX escaping issue
+        except json.JSONDecodeError:
             pass
 
-        # Try to extract JSON from markdown code blocks
-        # LLMs sometimes wrap JSON in ```json ... ```
-        code_block_match = re.search(
-            r'```(?:json)?\s*(\{.*?\})\s*```',
-            response_text,
-            re.DOTALL
-        )
-        if code_block_match:
-            try:
-                data = json.loads(code_block_match.group(1))
-                if isinstance(data, dict) and "cards" in data:
-                    return data["cards"]
-            except json.JSONDecodeError:
-                pass
+        # Strategy 2: Extract from markdown code blocks
+        # Try multiple markdown patterns
+        code_block_patterns = [
+            r'```json\s*(\{.*?\})\s*```',  # ```json { ... } ```
+            r'```\s*(\{.*?\})\s*```',      # ``` { ... } ```
+            r'```json\s*([\s\S]*?)\s*```', # ```json ... ``` (multiline)
+            r'```\s*([\s\S]*?)\s*```',     # ``` ... ``` (multiline)
+        ]
+        
+        for pattern in code_block_patterns:
+            match = re.search(pattern, response_text, re.DOTALL)
+            if match:
+                extracted = match.group(1).strip()
+                try:
+                    data = json.loads(extracted)
+                    if isinstance(data, dict) and "cards" in data:
+                        return data["cards"]
+                except json.JSONDecodeError:
+                    continue
 
-        # Try using json.JSONDecoder's raw_decode which is more lenient
-        # This can handle some malformed JSON
+        # Strategy 3: Find JSON object by matching braces
+        start = response_text.find('{')
+        if start >= 0:
+            # Find matching closing brace
+            depth = 0
+            for i in range(start, len(response_text)):
+                if response_text[i] == '{':
+                    depth += 1
+                elif response_text[i] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        json_str = response_text[start:i+1]
+                        try:
+                            data = json.loads(json_str)
+                            if isinstance(data, dict) and "cards" in data:
+                                return data["cards"]
+                        except json.JSONDecodeError:
+                            break
+
+        # Strategy 4: Use JSONDecoder's raw_decode (more lenient)
         try:
-            # Find the start of JSON
-            start = response_text.find('{')
             if start >= 0:
                 decoder = json.JSONDecoder()
                 data, _ = decoder.raw_decode(response_text[start:])
@@ -125,9 +257,9 @@ class LLMClient(ABC):
         except (json.JSONDecodeError, ValueError):
             pass
 
-        # Failed to parse
-        print(f"Warning: Could not parse JSON from LLM response")
-        print(f"Response preview: {response_text[:200]}...")
+        # All strategies failed
+        print(f"Warning: Could not parse JSON from LLM response after trying all strategies")
+        print(f"Response preview: {original_text[:300]}...")
         return []
 
 

@@ -1,7 +1,8 @@
 """Data models for extracted blocks and Anki notes."""
 
+import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -297,4 +298,40 @@ def create_revision_tag() -> str:
     from datetime import datetime
 
     return f"rev:{datetime.now().strftime('%Y%m%d')}"
+
+
+def validate_card_content(front: str, back: str, model: str) -> Tuple[bool, str]:
+    """
+    Validate that card content is usable.
+    
+    Args:
+        front: Front field content
+        back: Back field content
+        model: Card model name (Basic, Cloze, etc.)
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    front = front.strip()
+    back = back.strip()
+    
+    # Check for empty or too-short front
+    if not front or len(front) < 5:
+        return False, "Front too short or empty"
+    
+    # Check for Basic cards requiring non-empty back
+    if model == "Basic" and (not back or len(back) < 3):
+        return False, "Basic card requires non-empty back"
+    
+    # Check for LaTeX-only content (labels, refs, etc.) that renders as empty
+    # This matches content that's only whitespace and LaTeX commands
+    latex_only_pattern = r'^[\s\\{}]*$'
+    if re.match(latex_only_pattern, front):
+        return False, "Front contains only LaTeX commands"
+    
+    # Check for whitespace-only content
+    if not front.replace(" ", "").replace("\n", "").replace("\t", ""):
+        return False, "Front contains only whitespace"
+    
+    return True, ""
 

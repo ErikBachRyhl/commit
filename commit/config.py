@@ -238,7 +238,7 @@ def load_config(config_path: Path) -> AppConfig:
 
 def find_config(repo_path: Path) -> Optional[Path]:
     """
-    Find commit.yml in repository (supports legacy names too).
+    Find commit.yml in repository.
 
     Args:
         repo_path: Root directory of the repository
@@ -250,13 +250,6 @@ def find_config(repo_path: Path) -> Optional[Path]:
         repo_path / "commit.yml",
         repo_path / "commit.yaml",
         repo_path / ".commit.yml",
-        # Legacy support for old config names
-        repo_path / "renforce.yml",
-        repo_path / "renforce.yaml",
-        repo_path / ".renforce.yml",
-        repo_path / "anki-tex.yml",
-        repo_path / "anki-tex.yaml",
-        repo_path / ".anki-tex.yml",
     ]
 
     for candidate in candidates:

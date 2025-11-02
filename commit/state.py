@@ -7,17 +7,28 @@ from typing import Dict, Optional
 
 
 class StateManager:
-    """Manages persistent state for anki-tex."""
+    """Manages persistent state for Commit."""
 
     def __init__(self, state_file: Optional[Path] = None):
         """
         Initialize state manager.
 
         Args:
-            state_file: Path to state file. Defaults to ~/.anki_tex_state.json
+            state_file: Path to state file. Defaults to ~/.commit_state.json
         """
         if state_file is None:
-            state_file = Path.home() / ".anki_tex_state.json"
+            state_file = Path.home() / ".commit_state.json"
+            
+            # Migration: If old state file exists and new one doesn't, copy it over
+            old_state_file = Path.home() / ".anki_tex_state.json"
+            if old_state_file.exists() and not state_file.exists():
+                try:
+                    import shutil
+                    shutil.copy2(old_state_file, state_file)
+                    print(f"Migrated state from {old_state_file} to {state_file}")
+                except Exception as e:
+                    print(f"Warning: Could not migrate state file: {e}")
+        
         self.state_file = state_file
         self._state: Dict = self._load()
 

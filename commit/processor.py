@@ -756,19 +756,29 @@ def _generate_cards_batch_with_llm(
             "priority": meta["priority"],
             "env": block.env,
             "title": block.title or "",
-            "body": strip_dangerous_latex(block.body)[:2000],  # Truncate very long blocks
+            "body": strip_dangerous_latex(block.body)[:5000],  # Increased from 2000
             "file": block.file_path,
             "line": block.line_number,
-            "neighbor_context": strip_dangerous_latex(block.neighbor_context or "")[:1000]
+            "neighbor_context": strip_dangerous_latex(block.neighbor_context or "")[:2000]  # Increased from 1000
         })
         batch_payload["priorities"][meta["course"]] = meta["priority"]
     
     # Format batch prompt
+    # Convert conservativeness to guidance text
+    conservativeness = config.llm.selection_conservativeness
+    if conservativeness < 0.3:
+        guidance = "Be LIBERAL in selection - create cards for most blocks that have learning value. Err on the side of creating more cards."
+    elif conservativeness < 0.7:
+        guidance = "Be BALANCED in selection - select blocks with clear learning value, skip only obviously redundant content."
+    else:
+        guidance = "Be CONSERVATIVE in selection - only select the highest-value, most essential blocks."
+    
     system_prompt = BATCH_CARDS_SYSTEM_PROMPT.format(
         total_blocks=len(blocks_with_meta),
         daily_limit=config.daily_new_limit,
         max_cards_per_block=config.llm.max_cards_per_block,
-        paraphrase_strength=config.llm.paraphrase_strength
+        paraphrase_strength=config.llm.paraphrase_strength,
+        selection_guidance=guidance
     )
     
     # Call LLM

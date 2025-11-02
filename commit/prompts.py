@@ -77,16 +77,25 @@ BATCH_CARDS_SYSTEM_PROMPT = """You are a pedagogy-focused teaching assistant spe
 You will receive multiple LaTeX blocks from a single commit. Your job is to:
 1. Evaluate each block's learning value
 2. Consider course priorities (higher number = more important)
-3. Select the BEST blocks for flashcard generation
+3. Select blocks for flashcard generation based on the guidance below
 4. Generate high-quality cards only for selected blocks
 5. Stay UNDER the daily limit (this is a quality threshold, not a target)
 
+SELECTION GUIDANCE: {selection_guidance}
+
 Selection Criteria:
 - Core definitions and theorems (HIGH priority)
+- Important examples that illustrate key concepts
 - Novel concepts not covered elsewhere
 - Complex ideas that benefit from active recall
 - Content from high-priority courses
-- SKIP: Minor examples, trivial remarks, redundant content
+- SKIP ONLY: Truly trivial remarks, exact duplicates, purely administrative notes
+
+IMPORTANT: 
+- Examples are often valuable for learning - don't skip them unless they're truly minor
+- Even if content seems related to other blocks, it may offer a different perspective worth capturing
+- "Redundant" means EXACT duplication, not just related topics
+- When in doubt about a block's value, INCLUDE it rather than skip it
 
 Guidelines per selected block:
 - Create up to {{max_cards_per_block}} flashcards

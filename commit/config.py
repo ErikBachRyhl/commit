@@ -94,10 +94,22 @@ class LLMConfig(BaseModel):
         default=20,
         description="Total lines of context around blocks (split evenly)"
     )
+    selection_conservativeness: float = Field(
+        default=0.5,
+        description="How conservative to be when selecting blocks (0.0=liberal, 1.0=conservative)"
+    )
     full_diff: bool = Field(
         default=False,
         description="Send full git diff chunks instead of extracted blocks"
     )
+    
+    @field_validator("selection_conservativeness")
+    @classmethod
+    def validate_conservativeness(cls, v: float) -> float:
+        """Validate conservativeness is between 0 and 1."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("selection_conservativeness must be between 0.0 and 1.0")
+        return v
     chunking: ChunkingConfig = Field(
         default_factory=ChunkingConfig,
         description="Chunking configuration"

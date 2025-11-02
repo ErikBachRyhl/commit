@@ -44,14 +44,14 @@ setup.sh
 htmlcov/
 .tox/
 
-# Renforce specific
+# Commit specific
 .anki_tex_state.json
 dist/
 *.apkg
 
 # Config files (per-user in notes repos)
 # Uncomment if you want to track example configs:
-# !example/renforce.yml
+# !example/commit.yml
 
 # OS
 .DS_Store

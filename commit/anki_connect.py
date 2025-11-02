@@ -182,6 +182,21 @@ class AnkiConnectClient:
 
         result = await self.invoke("notesInfo", notes=note_ids)
         return result if result else []
+    
+    async def delete_notes(self, note_ids: List[int]) -> None:
+        """
+        Delete notes from Anki.
+
+        Args:
+            note_ids: List of note IDs to delete
+
+        Raises:
+            AnkiConnectError: If deletion fails
+        """
+        if not note_ids:
+            return
+        
+        await self.invoke("deleteNotes", notes=note_ids)
 
     async def create_deck(self, deck_name: str) -> int:
         """

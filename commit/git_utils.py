@@ -56,6 +56,30 @@ def get_current_sha(repo_path: Path) -> str:
         raise GitError(f"Failed to get current SHA: {e}") from e
 
 
+def get_parent_commit(repo_path: Path, sha: str) -> Optional[str]:
+    """
+    Get the parent commit SHA of a given commit.
+    
+    Args:
+        repo_path: Path to Git repository
+        sha: Commit SHA to get parent of
+    
+    Returns:
+        Parent commit SHA, or None if commit has no parents (initial commit)
+    
+    Raises:
+        GitError: If unable to get parent commit
+    """
+    try:
+        repo = get_repo(repo_path)
+        commit = repo.commit(sha)
+        if commit.parents:
+            return commit.parents[0].hexsha
+        return None
+    except Exception as e:
+        raise GitError(f"Failed to get parent of {sha}: {e}") from e
+
+
 def get_changed_files(
     repo_path: Path,
     since_sha: Optional[str] = None,

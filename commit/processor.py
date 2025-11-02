@@ -457,11 +457,13 @@ def process_repository(
                     note_ids = client.add_notes(anki_format)
 
                     if note_ids and note_ids[0]:
+                        # Record note with its own GUID (not block.guid)
+                        # For LLM cards, note.guid is content-based and different from block.guid
                         state.record_note(
-                            block.guid,
+                            note.guid,  # Use note's GUID, not block's
                             note_ids[0],
                             note.deck_name,
-                            block.content_hash,
+                            note.content_hash,  # Use note's content hash
                         )
                         
                         # Inject GUID into source file if it doesn't exist
@@ -500,7 +502,7 @@ def process_repository(
 
                 elif action == "update":
                     # Update existing note
-                    anki_note_id = state.get_anki_note_id(block.guid)
+                    anki_note_id = state.get_anki_note_id(note.guid)  # Use note.guid
 
                     if anki_note_id:
                         client.update_note_fields(anki_note_id, note.fields)
@@ -509,12 +511,12 @@ def process_repository(
                         rev_tag = create_revision_tag()
                         client.add_tags([anki_note_id], rev_tag)
 
-                        # Update state
+                        # Update state with note's GUID
                         state.record_note(
-                            block.guid,
+                            note.guid,
                             anki_note_id,
                             note.deck_name,
-                            block.content_hash,
+                            note.content_hash,
                         )
                     else:
                         stats["warnings"].append(
@@ -750,16 +752,22 @@ def _generate_cards_batch_with_llm(
     
     for i, meta in enumerate(blocks_with_meta):
         block = meta["block"]
+        # Create clear description with environment type prominently displayed
+        env_upper = block.env.upper()
+        description = f"[{env_upper}] {block.title}" if block.title else f"[{env_upper}] (untitled)"
+        
         batch_payload["blocks"].append({
             "index": i,
             "course": meta["course"],
             "priority": meta["priority"],
-            "env": block.env,
+            "env_type": env_upper,  # Prominent uppercase env type
+            "env": block.env,  # Original lowercase
+            "description": description,  # Combined description
             "title": block.title or "",
-            "body": strip_dangerous_latex(block.body)[:5000],  # Increased from 2000
+            "body": strip_dangerous_latex(block.body)[:5000],
             "file": block.file_path,
             "line": block.line_number,
-            "neighbor_context": strip_dangerous_latex(block.neighbor_context or "")[:2000]  # Increased from 1000
+            "neighbor_context": strip_dangerous_latex(block.neighbor_context or "")[:2000]
         })
         batch_payload["priorities"][meta["course"]] = meta["priority"]
     

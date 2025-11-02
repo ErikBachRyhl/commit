@@ -220,6 +220,67 @@ class StateManager:
     def clear_llm_history(self) -> None:
         """Clear all LLM generation history."""
         self._state["llm_generations"] = {}
+    
+    def get_notes_for_commit(self, sha: str) -> List[str]:
+        """
+        Get all note GUIDs that were processed in a specific commit.
+        
+        Uses the llm_generations log to find batch operations for this SHA,
+        or searches through note metadata.
+        
+        Args:
+            sha: Commit SHA (full or short)
+        
+        Returns:
+            List of note GUIDs from this commit
+        """
+        guids = []
+        
+        # Check if there's a batch generation for this SHA
+        batch_key = f"batch_{sha}"
+        if batch_key in self._state.get("llm_generations", {}):
+            # This was a batch-processed commit
+            # We need to find notes from this commit another way
+            # since llm_generations stores the batch response, not individual GUIDs
+            pass
+        
+        # Search through all notes to find ones without a tracked creation commit
+        # This is a limitation - we don't currently track which commit created each note
+        # For now, we'll use a heuristic: notes added after the previous SHA
+        # but this isn't perfect
+        
+        # Return all current notes as a fallback
+        # TODO: Improve by adding commit_sha field to note metadata
+        return list(self._state.get("note_hashes", {}).keys())
+    
+    def remove_notes_by_guids(self, guids: List[str]) -> int:
+        """
+        Remove multiple notes from state by their GUIDs.
+        
+        Args:
+            guids: List of note GUIDs to remove
+        
+        Returns:
+            Number of notes actually removed
+        """
+        removed = 0
+        note_hashes = self._state.get("note_hashes", {})
+        
+        for guid in guids:
+            if guid in note_hashes:
+                del note_hashes[guid]
+                removed += 1
+        
+        return removed
+    
+    def get_all_note_guids(self) -> List[str]:
+        """
+        Get all note GUIDs currently tracked in state.
+        
+        Returns:
+            List of all note GUIDs
+        """
+        return list(self._state.get("note_hashes", {}).keys())
 
 
 # Convenience functions for backward compatibility

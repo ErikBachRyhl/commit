@@ -233,6 +233,132 @@ def stats(
 
 
 @app.command()
+def undo(
+    repo: Path = typer.Argument(..., help="Path to notes repository"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+    state_file: Optional[Path] = typer.Option(
+        None,
+        "--state-file",
+        help="Path to state file",
+    ),
+):
+    """
+    Undo the last processing run.
+    
+    Deletes all Anki cards created in the most recent 'commit process' run
+    and resets the state to before that run. This allows you to adjust
+    LLM settings and reprocess the same commit.
+    """
+    from .state import StateManager
+    from .anki_connect import SyncAnkiConnectClient
+    from .git_utils import get_parent_commit
+    
+    console.print("\n[bold]Undoing Last Processing Run[/bold]\n")
+    
+    try:
+        # Load state
+        manager = StateManager(state_file)
+        stats = manager.get_stats()
+        
+        last_sha = stats.get("last_processed_sha")
+        if not last_sha:
+            console.print("[yellow]No processing history found[/yellow]")
+            raise typer.Exit()
+        
+        console.print(f"Last processed commit: [cyan]{last_sha[:8]}[/cyan]")
+        
+        # Connect to Anki
+        client = SyncAnkiConnectClient()
+        if not client.check_connection():
+            console.print(
+                "[red]Cannot connect to AnkiConnect.[/red]\n"
+                "Make sure Anki is running with AnkiConnect installed."
+            )
+            raise typer.Exit(code=1)
+        
+        # Find cards with the commit tag
+        tag_query = f"tag:commit:{last_sha[:8]}"
+        console.print(f"\nSearching for cards: [dim]{tag_query}[/dim]")
+        
+        note_ids = client.find_notes(tag_query)
+        
+        if not note_ids:
+            console.print("[yellow]No cards found with this commit tag[/yellow]")
+            console.print("[dim]This might mean cards were already deleted[/dim]")
+        else:
+            # Get note info for preview
+            notes_info = client.notes_info(note_ids)
+            
+            # Show preview
+            console.print(f"\n[bold]Found {len(note_ids)} card(s) to delete:[/bold]\n")
+            
+            # Group by deck
+            decks = {}
+            for note in notes_info:
+                deck_name = note.get("deckName", "Unknown")
+                if deck_name not in decks:
+                    decks[deck_name] = []
+                decks[deck_name].append(note)
+            
+            for deck_name, deck_notes in decks.items():
+                console.print(f"  [cyan]{deck_name}[/cyan]: {len(deck_notes)} card(s)")
+                for note in deck_notes[:3]:  # Show first 3 cards
+                    fields = note.get("fields", {})
+                    front = fields.get("Front", {}).get("value", "")[:60]
+                    console.print(f"    - {front}...")
+                if len(deck_notes) > 3:
+                    console.print(f"    ... and {len(deck_notes) - 3} more")
+            
+            # Confirm
+            if not force:
+                try:
+                    confirm = typer.confirm(
+                        f"\nDelete these {len(note_ids)} card(s) from Anki?"
+                    )
+                    if not confirm:
+                        console.print("[yellow]Cancelled[/yellow]")
+                        raise typer.Exit()
+                except (KeyboardInterrupt, EOFError):
+                    console.print("\n[yellow]Cancelled[/yellow]")
+                    raise typer.Exit()
+            
+            # Delete cards
+            console.print("\n[cyan]Deleting cards from Anki...[/cyan]")
+            client.delete_notes(note_ids)
+            console.print(f"[green]✓ Deleted {len(note_ids)} card(s)[/green]")
+        
+        # Get all note GUIDs and remove them from state
+        all_guids = manager.get_all_note_guids()
+        if all_guids:
+            removed = manager.remove_notes_by_guids(all_guids)
+            console.print(f"[green]✓ Removed {removed} note(s) from state[/green]")
+        
+        # Reset to parent commit
+        try:
+            parent_sha = get_parent_commit(repo, last_sha)
+            if parent_sha:
+                manager.set_last_processed_sha(parent_sha)
+                console.print(f"[green]✓ Reset to parent commit: {parent_sha[:8]}[/green]")
+            else:
+                # Initial commit, reset to None
+                manager.set_last_processed_sha(None)
+                console.print(f"[green]✓ Reset state (was initial commit)[/green]")
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not reset SHA: {e}[/yellow]")
+            console.print("[dim]State cleared but SHA unchanged[/dim]")
+        
+        # Save state
+        manager.save()
+        
+        console.print("\n[bold green]Undo complete![/bold green]")
+        console.print("[dim]You can now reprocess with different settings[/dim]")
+        
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def reconcile_state(
     repo: Path = typer.Option(
         Path.cwd(),

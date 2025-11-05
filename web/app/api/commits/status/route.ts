@@ -20,11 +20,11 @@ export async function POST(req: NextRequest) {
     // Get statuses for all commits
     const statusMap = await getCommitStatuses(commitShas)
     
-    // Convert Map to array format for JSON response
-    const statuses = commitShas.map(sha => ({
-      sha,
-      status: statusMap.get(sha) || 'new'
-    }))
+    // Convert Map to object format for JSON response
+    const statuses: Record<string, string> = {}
+    commitShas.forEach(sha => {
+      statuses[sha] = statusMap.get(sha) || 'new'
+    })
     
     return NextResponse.json({ statuses })
     

@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, GitBranch, RefreshCw } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ArrowLeft, GitBranch, RefreshCw, Code2, AlertCircle, Zap, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 
 type User = {
@@ -30,6 +34,9 @@ type Settings = {
   parsing: any
   cards: any
   rawYaml?: string | null
+  devMode?: boolean
+  syncTarget?: string
+  ankiConnectUrl?: string
 } | null
 
 export function SettingsContent({
@@ -42,6 +49,12 @@ export function SettingsContent({
   settings: Settings
 }) {
   const [refreshing, setRefreshing] = useState(false)
+  const [devMode, setDevMode] = useState(settings?.devMode || false)
+  const [togglingDevMode, setTogglingDevMode] = useState(false)
+  const [syncTarget, setSyncTarget] = useState(settings?.syncTarget || 'apkg')
+  const [ankiConnectUrl, setAnkiConnectUrl] = useState(settings?.ankiConnectUrl || 'http://localhost:8765')
+  const [testingConnection, setTestingConnection] = useState(false)
+  const [savingSync, setSavingSync] = useState(false)
 
   async function handleRefreshConfig() {
     if (!repoLink) return
@@ -67,6 +80,77 @@ export function SettingsContent({
       toast.error(error.message)
     } finally {
       setRefreshing(false)
+    }
+  }
+
+  async function handleToggleDevMode(enabled: boolean) {
+    try {
+      setTogglingDevMode(true)
+      const response = await fetch('/api/settings/dev-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ devMode: enabled }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to update developer mode')
+      }
+
+      setDevMode(enabled)
+      toast.success(`Developer mode ${enabled ? 'enabled' : 'disabled'}`)
+    } catch (error: any) {
+      toast.error(error.message)
+    } finally {
+      setTogglingDevMode(false)
+    }
+  }
+
+  async function handleTestConnection() {
+    try {
+      setTestingConnection(true)
+      const response = await fetch('/api/anki/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: ankiConnectUrl }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Connection test failed')
+      }
+
+      const data = await response.json()
+      toast.success(`Connected to Anki! Version: ${data.version}`)
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to connect to Anki')
+    } finally {
+      setTestingConnection(false)
+    }
+  }
+
+  async function handleSaveSync() {
+    try {
+      setSavingSync(true)
+      const response = await fetch('/api/settings/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          syncTarget,
+          ankiConnectUrl,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to save sync settings')
+      }
+
+      toast.success('Sync settings saved')
+    } catch (error: any) {
+      toast.error(error.message)
+    } finally {
+      setSavingSync(false)
     }
   }
 
@@ -104,6 +188,14 @@ export function SettingsContent({
             <TabsTrigger value="llm">LLM</TabsTrigger>
             <TabsTrigger value="parsing">Parsing</TabsTrigger>
             <TabsTrigger value="cards">Cards</TabsTrigger>
+            <TabsTrigger value="sync">
+              <Zap className="h-3 w-3 mr-1" />
+              Sync
+            </TabsTrigger>
+            <TabsTrigger value="developer">
+              <Code2 className="h-3 w-3 mr-1" />
+              Developer
+            </TabsTrigger>
             {settings?.rawYaml && <TabsTrigger value="yaml">Raw YAML</TabsTrigger>}
           </TabsList>
 
@@ -288,6 +380,167 @@ export function SettingsContent({
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="sync" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Sync Target</CardTitle>
+                <CardDescription>
+                  Choose how to export your flashcards
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <RadioGroup value={syncTarget} onValueChange={setSyncTarget}>
+                  <div className="flex items-start space-x-3 space-y-0">
+                    <RadioGroupItem value="apkg" id="apkg" />
+                    <div className="space-y-1 leading-none">
+                      <Label htmlFor="apkg" className="font-semibold cursor-pointer">
+                        Download .apkg File (Default)
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Export cards as an Anki package file that you can manually import
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3 space-y-0">
+                    <RadioGroupItem value="ankiconnect" id="ankiconnect" />
+                    <div className="space-y-1 leading-none">
+                      <Label htmlFor="ankiconnect" className="font-semibold cursor-pointer">
+                        AnkiConnect (Direct Import)
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Push cards directly to Anki using the AnkiConnect add-on
+                      </p>
+                    </div>
+                  </div>
+                </RadioGroup>
+
+                {syncTarget === 'ankiconnect' && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="space-y-2">
+                      <Label htmlFor="anki-url">AnkiConnect URL</Label>
+                      <Input
+                        id="anki-url"
+                        type="url"
+                        value={ankiConnectUrl}
+                        onChange={(e) => setAnkiConnectUrl(e.target.value)}
+                        placeholder="http://localhost:8765"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Make sure Anki is running with the AnkiConnect add-on installed
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleTestConnection}
+                        disabled={testingConnection}
+                        size="sm"
+                      >
+                        {testingConnection ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            Testing...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Test Connection
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    <div className="border border-border bg-muted p-3 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold">
+                            AnkiConnect Setup
+                          </p>
+                          <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+                            <li>Install the <strong>AnkiConnect</strong> add-on in Anki</li>
+                            <li>Restart Anki</li>
+                            <li>Keep Anki running while using this app</li>
+                          </ol>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            💡 Cards will be automatically synced to the correct deck based on your course configuration.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-4">
+                  <Button onClick={handleSaveSync} disabled={savingSync}>
+                    {savingSync ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Settings'
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="developer" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Developer Mode</CardTitle>
+                <CardDescription>
+                  Advanced features for testing and development
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 flex-1">
+                    <Label htmlFor="dev-mode" className="text-base font-semibold">
+                      Enable Developer Mode
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Unlock advanced features like force reprocessing, verbose logs, and detailed status previews
+                    </p>
+                  </div>
+                  <Switch
+                    id="dev-mode"
+                    checked={devMode}
+                    onCheckedChange={handleToggleDevMode}
+                    disabled={togglingDevMode}
+                  />
+                </div>
+
+                {devMode && (
+                  <div className="border border-border bg-muted p-3 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Code2 className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold">
+                          Developer Mode Active
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          You now have access to:
+                        </p>
+                        <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                          <li><strong>Force Reprocess:</strong> Override cached state and reprocess commits</li>
+                          <li><strong>Status Preview:</strong> See which commits are new/processed/need re-run</li>
+                          <li><strong>Verbose Logs:</strong> More detailed CLI output for debugging</li>
+                        </ul>
+                        <p className="text-xs text-muted-foreground mt-3">
+                          💡 Tip: Use "Force Reprocess" when testing LLM prompts or checking if deleted files are properly handled.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

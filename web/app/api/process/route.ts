@@ -20,6 +20,7 @@ const ProcessSchema = z.object({
   enableLlm: z.boolean().optional(),
   provider: z.string().optional(),
   model: z.string().optional(),
+  force: z.boolean().optional().default(false), // Force reprocess (dev mode)
 })
 
 export async function POST(req: NextRequest) {
@@ -37,6 +38,9 @@ export async function POST(req: NextRequest) {
     console.log('[API /process] Request body:', JSON.stringify(body, null, 2))
     const options = ProcessSchema.parse(body)
     console.log('[API /process] Parsed options:', options)
+    if (options.force) {
+      console.log('[API /process] 🔥 FORCE MODE: Will reprocess commits regardless of cache state')
+    }
 
     // Get repo link
     console.log('[API /process] Fetching repo link...')

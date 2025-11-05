@@ -97,6 +97,10 @@ model Settings {
   // Dev mode for testing features
   devMode   Boolean  @default(false)
   
+  // AnkiConnect settings
+  syncTarget       String  @default("apkg") // "apkg" or "ankiconnect"
+  ankiConnectUrl   String  @default("http://localhost:8765")
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

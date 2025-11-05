@@ -1,0 +1,159 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  repos         RepoLink[]
+  settings      Settings?
+  runs          ProcessingRun[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Application models
+model RepoLink {
+  id             String  @id @default(cuid())
+  userId         String
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       String  // 'github'
+  owner          String
+  repo           String
+  defaultBranch  String  @default("main")
+  yamlPath       String  @default("commit.yml")
+  lastSyncedSha  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  runs           ProcessingRun[]
+
+  @@unique([userId, owner, repo])
+}
+
+model Settings {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Normalized fields that mirror YAML
+  courses   Json     // [{key, title, paths, deck}]
+  llm       Json     // {provider, model, temperature, maxTokens, enabled, etc}
+  parsing   Json     // {envsToExtract, neighborContextLines, etc}
+  cards     Json     // {dailyNewLimit, priorities, tags}
+  rawYaml   String?  @db.Text // Original YAML text for round-trip
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProcessingRun {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repoId      String?
+  repo        RepoLink? @relation(fields: [repoId], references: [id], onDelete: SetNull)
+  
+  commitSha   String?
+  status      String    // 'queued' | 'running' | 'succeeded' | 'failed'
+  logs        Json      @default("[]") // [{ts, level, msg}]
+  
+  startedAt   DateTime?
+  endedAt     DateTime?
+  createdAt   DateTime  @default(now())
+  
+  // Stats from CLI output
+  filesProcessed  Int?
+  blocksExtracted Int?
+  notesCreated    Int?
+  notesUpdated    Int?
+  notesSkipped    Int?
+  
+  // Artifact paths
+  apkgPath    String?
+  
+  suggestions CardSuggestion[]
+}
+
+model CardSuggestion {
+  id          String         @id @default(cuid())
+  runId       String
+  run         ProcessingRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  
+  idx         Int            // Order in the run
+  front       String         @db.Text
+  back        String         @db.Text
+  tags        String[]
+  cardType    String         @default("basic") // 'basic' | 'cloze'
+  sourceFile  String?
+  sourceLine  Int?
+  state       String         @default("pending") // 'pending' | 'accepted' | 'discarded'
+  metadata    Json?          // Additional metadata from LLM
+  
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  actions     CardAction[]
+
+  @@index([runId, state])
+}
+
+model CardAction {
+  id           String         @id @default(cuid())
+  suggestionId String
+  suggestion   CardSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+  
+  action       String         // 'add' | 'discard' | 'recreate'
+  payload      Json?          // Additional action data
+  createdAt    DateTime       @default(now())
+}

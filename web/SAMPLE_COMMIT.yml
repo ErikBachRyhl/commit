@@ -1,0 +1,36 @@
+# Minimal commit.yml configuration
+# This is a working example for the web UI
+
+courses:
+  DiffTop:
+    paths:
+      - "DiffTop/**/*.tex"
+    deck: "Differential Topology"
+
+envs_to_extract:
+  - definition
+  - theorem
+  - proposition
+  - lemma
+  - corollary
+  - example
+  - remark
+
+llm:
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0.2
+  enable_generated: true
+  max_cards_per_block: 2
+
+daily_new_limit: 30
+
+priorities:
+  DiffTop: 5
+
+tags:
+  - auto
+  - from-tex
+  - commit:{sha}
+  - file:{file}
+

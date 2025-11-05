@@ -1,0 +1,95 @@
+# Full commit.yml configuration
+# This includes all your courses and features
+
+courses:
+  DiffTop:
+    paths:
+      - "DiffTop/**/*.tex"
+    deck: "Differential Topology"
+  
+  DiffTop2:
+    paths:
+      - "DiffTop2/**/*.tex"
+    deck: "Differential Topology Test"
+  
+  DiffTop3:
+    paths:
+      - "DiffTop3/**/*.tex"
+    deck: "Differential Topology Test 2"
+  
+  PDE:
+    paths:
+      - "PDE/**/*.tex"
+    deck: "Partial Differential Equations"
+  
+  ComplexAnalysis:
+    paths:
+      - "ComAn/**/*.tex"
+    deck: "Complex Analysis"
+  
+  QFT:
+    paths:
+      - "QFT/**/*.tex"
+    deck: "Quantum Field Theory"
+  
+  Test:
+    paths:
+      - "Test/**/*.tex"
+    deck: "Test"
+
+envs_to_extract:
+  - definition
+  - theorem
+  - proposition
+  - lemma
+  - corollary
+  - example
+  - remark
+  - problem
+  - exercise
+  - mtheorem
+  - mprop
+  - mlemma
+  - mcorollary
+  - mexample
+  - mremark
+  - mproblem
+
+llm:
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0.2
+  max_output_tokens: 1200
+  enable_generated: true
+  paraphrase_strength: 0.6
+  max_cards_per_block: 2
+  neighbor_context_lines: 20
+  selection_conservativeness: 0.1
+  full_diff: false
+
+chunking:
+  mode: auto
+  max_chars: 160000
+  overlap_lines: 10
+
+chat:
+  enabled: true
+  default_scope: latest
+  lastN: 1
+  mentor_auto_add: false
+
+daily_new_limit: 30
+
+priorities:
+  DiffTop: 5
+  PDE: 2
+  ComplexAnalysis: 1
+  QFT: 1
+
+tags:
+  - auto
+  - course:{course}
+  - from-tex
+  - commit:{sha}
+  - file:{file}
+

@@ -49,10 +49,11 @@ export async function POST(req: NextRequest) {
     const defaultBranch = await getRepoDefaultBranch(account.access_token, owner, repo)
 
     // Create or update repo link
+    const userId = session.user.id!
     const repoLink = await prisma.repoLink.upsert({
       where: {
         userId_owner_repo: {
-          userId: session.user.id,
+          userId,
           owner,
           repo,
         },
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
         updatedAt: new Date(),
       },
       create: {
-        userId: session.user.id,
+        userId,
         provider: 'github',
         owner,
         repo,
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
+        { error: 'Invalid request data', details: error.issues },
         { status: 400 }
       )
     }

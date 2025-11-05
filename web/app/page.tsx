@@ -34,7 +34,7 @@ export default async function HomePage() {
 
   return (
     <DashboardContent
-      user={session.user}
+      user={session.user as any}
       linkedRepo={linkedRepo}
       settings={settings}
       recentRuns={recentRuns}

@@ -1,5 +1,23 @@
 # Local Development Setup
 
+## Prerequisites
+
+Before running the web UI, you need:
+
+1. ✅ **Python dependencies installed** (see [PYTHON_SETUP.md](./PYTHON_SETUP.md))
+2. ✅ **LOCAL_REPO_PATH set** in your `.env` file
+
+## Quick Fix for Python Errors
+
+If you see `ModuleNotFoundError: No module named 'typer'`:
+
+```bash
+cd /Users/erik/Projects/apps/AnkiChat
+pip3 install -e .
+```
+
+See [PYTHON_SETUP.md](./PYTHON_SETUP.md) for detailed instructions.
+
 ## Quick Fix for "LOCAL_REPO_PATH Required" Error
 
 If you see an error about `LOCAL_REPO_PATH` when trying to process commits, follow these steps:

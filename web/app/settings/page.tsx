@@ -22,7 +22,7 @@ export default async function SettingsPage() {
 
   return (
     <SettingsContent
-      user={session.user}
+      user={session.user as any}
       repoLink={repoLink}
       settings={settings}
     />

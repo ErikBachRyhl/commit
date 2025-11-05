@@ -60,9 +60,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Create processing run record
+    const userId = session.user.id!
     const run = await prisma.processingRun.create({
       data: {
-        userId: session.user.id,
+        userId,
         repoId: options.repoId,
         status: 'queued',
         logs: [],
@@ -187,12 +188,12 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Error starting process:', error)
     
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      )
-    }
+        if (error instanceof z.ZodError) {
+          return NextResponse.json(
+            { error: 'Invalid request data', details: error.issues },
+            { status: 400 }
+          )
+        }
     
     return NextResponse.json(
       { error: error.message || 'Failed to start processing' },

@@ -70,28 +70,29 @@ export async function POST(req: NextRequest) {
     const normalized = normalizeConfig(config)
     console.log('Normalized courses count:', normalized.courses.length)
 
-    // Save to settings
-    const settings = await prisma.settings.upsert({
-      where: {
-        userId: session.user.id,
-      },
-      update: {
-        courses: normalized.courses,
-        llm: normalized.llm,
-        parsing: normalized.parsing,
-        cards: normalized.cards,
-        rawYaml: yamlContent,
-        updatedAt: new Date(),
-      },
-      create: {
-        userId: session.user.id,
-        courses: normalized.courses,
-        llm: normalized.llm,
-        parsing: normalized.parsing,
-        cards: normalized.cards,
-        rawYaml: yamlContent,
-      },
-    })
+        // Save to settings
+        const userId = session.user.id!
+        const settings = await prisma.settings.upsert({
+          where: {
+            userId,
+          },
+          update: {
+            courses: normalized.courses as any,
+            llm: normalized.llm as any,
+            parsing: normalized.parsing as any,
+            cards: normalized.cards as any,
+            rawYaml: yamlContent,
+            updatedAt: new Date(),
+          },
+          create: {
+            userId,
+            courses: normalized.courses as any,
+            llm: normalized.llm as any,
+            parsing: normalized.parsing as any,
+            cards: normalized.cards as any,
+            rawYaml: yamlContent,
+          },
+        })
 
     return NextResponse.json({ 
       settings,
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
+        { error: 'Invalid request data', details: error.issues },
         { status: 400 }
       )
     }

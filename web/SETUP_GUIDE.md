@@ -123,13 +123,18 @@ Open http://localhost:3000 in your browser.
    - Click "Import commit.yml"
    - This fetches and parses your configuration
 4. **Process Notes**:
-   - Click "Process Now"
+   - Click "Process Now" → Opens Commit Selector dialog
+   - Choose commit range: "Latest only", "Since commit", or "All"
+   - Select starting commit (defaults to 5 commits ago)
+   - Click "Start Processing"
    - Watch live console output
    - Review generated cards in carousel
 5. **Download Cards**:
    - Accept/discard cards using A/D keys
    - Click "Download .apkg"
    - Import into Anki
+
+See [COMMIT_SELECTOR.md](./COMMIT_SELECTOR.md) for detailed info on the commit selector feature.
 
 ## Troubleshooting
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RepoPicker } from "@/components/repo-picker"
+import { CommitSelector } from "@/components/commit-selector"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { GitBranch, LogOut, Settings, PlayCircle, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
@@ -56,6 +57,7 @@ export function DashboardContent({
   recentRuns: Run[]
 }) {
   const [showRepoPicker, setShowRepoPicker] = useState(false)
+  const [showCommitSelector, setShowCommitSelector] = useState(false)
   const [linking, setLinking] = useState(false)
 
   async function handleRepoSelected(repo: any) {
@@ -207,18 +209,20 @@ export function DashboardContent({
             {/* Process CTA */}
             <Card>
               <CardHeader>
-                <CardTitle>Process Today's Commit</CardTitle>
+                <CardTitle>Process Commits</CardTitle>
                 <CardDescription>
-                  Extract flashcards from your latest LaTeX changes
+                  Extract flashcards from your LaTeX changes
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Link href={`/runs/new?repoId=${linkedRepo.id}`}>
-                  <Button size="lg" className="w-full md:w-auto">
-                    <PlayCircle className="h-5 w-5 mr-2" />
-                    Process Now
-                  </Button>
-                </Link>
+                <Button 
+                  size="lg" 
+                  className="w-full md:w-auto"
+                  onClick={() => setShowCommitSelector(true)}
+                >
+                  <PlayCircle className="h-5 w-5 mr-2" />
+                  Process Now
+                </Button>
               </CardContent>
             </Card>
 
@@ -271,6 +275,15 @@ export function DashboardContent({
           <RepoPicker onRepoSelected={handleRepoSelected} />
         </DialogContent>
       </Dialog>
+
+      {/* Commit Selector Dialog */}
+      {linkedRepo && (
+        <CommitSelector
+          open={showCommitSelector}
+          onOpenChange={setShowCommitSelector}
+          repoId={linkedRepo.id}
+        />
+      )}
     </div>
   )
 }

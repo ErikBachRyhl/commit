@@ -75,7 +75,7 @@ class LLMConfig(BaseModel):
         description="Temperature for generation (0-1)"
     )
     max_output_tokens: int = Field(
-        default=1200,
+        default=4096,
         description="Maximum tokens to generate"
     )
     enable_generated: bool = Field(

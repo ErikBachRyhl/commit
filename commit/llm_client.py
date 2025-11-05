@@ -19,7 +19,7 @@ class LLMClient(ABC):
         self,
         model: str,
         temperature: float = 0.2,
-        max_tokens: int = 1200,
+        max_tokens: int = 4096,
     ):
         """
         Initialize LLM client.
@@ -129,7 +129,8 @@ class LLMClient(ABC):
                 if "skipped_blocks" not in data:
                     data["skipped_blocks"] = []
                 return data
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(f"  Direct parse failed: {e}")
             pass
 
         # Strategy 2: Extract from markdown code blocks
@@ -177,9 +178,21 @@ class LLMClient(ABC):
                         except json.JSONDecodeError:
                             break
 
-        # All strategies failed - return empty structure
+        # All strategies failed - save response for debugging and return empty structure
         print(f"Warning: Could not parse batch response from LLM")
-        print(f"Response preview: {original_text[:300]}...")
+        print(f"Response preview: {original_text[:500]}...")
+        
+        # Save full response to file for debugging
+        import tempfile
+        import os
+        debug_file = os.path.join(tempfile.gettempdir(), 'llm_batch_response_debug.txt')
+        try:
+            with open(debug_file, 'w') as f:
+                f.write(original_text)
+            print(f"  Full response saved to: {debug_file}")
+        except Exception as e:
+            print(f"  Could not save debug file: {e}")
+        
         return {"selected_blocks": [], "skipped_blocks": []}
 
     def _parse_json_response(self, response_text: str) -> List[Dict[str, Any]]:
@@ -271,7 +284,7 @@ class OpenAIClient(LLMClient):
         api_key: str,
         model: str = "gpt-4o-mini",
         temperature: float = 0.2,
-        max_tokens: int = 1200,
+        max_tokens: int = 4096,
     ):
         """Initialize OpenAI client."""
         super().__init__(model, temperature, max_tokens)
@@ -317,7 +330,7 @@ class AnthropicClient(LLMClient):
         api_key: str,
         model: str = "claude-sonnet-4",
         temperature: float = 0.2,
-        max_tokens: int = 1200,
+        max_tokens: int = 4096,
     ):
         """Initialize Anthropic client."""
         super().__init__(model, temperature, max_tokens)
@@ -363,7 +376,7 @@ class GeminiClient(LLMClient):
         api_key: str,
         model: str = "gemini-2.0-flash-exp",
         temperature: float = 0.2,
-        max_tokens: int = 1200,
+        max_tokens: int = 4096,
     ):
         """Initialize Gemini client."""
         super().__init__(model, temperature, max_tokens)

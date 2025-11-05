@@ -52,6 +52,7 @@ model User {
   repos         RepoLink[]
   settings      Settings?
   runs          ProcessingRun[]
+  jobs          Job[]
 }
 
 model VerificationToken {
@@ -93,8 +94,51 @@ model Settings {
   cards     Json     // {dailyNewLimit, priorities, tags}
   rawYaml   String?  @db.Text // Original YAML text for round-trip
   
+  // Dev mode for testing features
+  devMode   Boolean  @default(false)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Job Queue System
+model Job {
+  id              String    @id @default(uuid())
+  type            String    // 'reprocess', 'audit', etc.
+  selector        Json      // {commit_ids: [...]} or {course_id: ...}
+  force           Boolean   @default(false)
+  idempotencyKey  String?   // hash(type+selector) when !force
+  status          String    @default("queued") // queued|running|done|failed|cancelled
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  error           String?   @db.Text
+  
+  user            User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  commitRuns      CommitRun[]
+  
+  @@unique([idempotencyKey], map: "unique_active_jobs")
+  @@index([status, createdAt])
+  @@map("jobs")
+}
+
+model CommitRun {
+  id               String   @id @default(uuid())
+  commitSha        String
+  pipelineVersion  String   // e.g. "parser-1.1/card-v2"
+  runVersion       String   @default(uuid())
+  jobId            String?
+  status           String   // success|failed|skipped|running
+  artifactUri      String?
+  metrics          Json?    // {blocks: 31, cards: 62, tokens: ...}
+  createdAt        DateTime @default(now())
+  
+  job              Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  
+  @@unique([commitSha, pipelineVersion, runVersion])
+  @@index([commitSha, pipelineVersion, status])
+  @@map("commit_runs")
 }
 
 model ProcessingRun {

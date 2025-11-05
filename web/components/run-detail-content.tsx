@@ -45,12 +45,17 @@ export function RunDetailContent({ run: initialRun }: { run: Run }) {
   const router = useRouter()
   const [killing, setKilling] = useState(false)
   const [run, setRun] = useState(initialRun)
+  const [pollFailures, setPollFailures] = useState(0)
   const isRunning = run.status === 'running' || run.status === 'queued'
   const hasCards = run.suggestions.length > 0
 
-  // Poll for status updates when running
+  // Poll for status updates when running (with exponential backoff on failures)
   useEffect(() => {
     if (!isRunning) return
+
+    // Calculate delay with exponential backoff: 5s, 10s, 20s, max 30s
+    const baseDelay = 5000
+    const backoffDelay = Math.min(baseDelay * Math.pow(2, pollFailures), 30000)
 
     const interval = setInterval(async () => {
       try {
@@ -59,19 +64,23 @@ export function RunDetailContent({ run: initialRun }: { run: Run }) {
           const data = await response.json()
           if (data.run) {
             setRun(data.run)
+            setPollFailures(0) // Reset failures on success
             // If status changed from running, refresh the page to get cards
             if (data.run.status !== 'running' && data.run.status !== 'queued') {
               router.refresh()
             }
           }
+        } else {
+          setPollFailures(prev => prev + 1)
         }
       } catch (error) {
         console.error('Error polling run status:', error)
+        setPollFailures(prev => prev + 1)
       }
-    }, 2000) // Poll every 2 seconds
+    }, backoffDelay)
 
     return () => clearInterval(interval)
-  }, [isRunning, run.id, router])
+  }, [isRunning, run.id, router, pollFailures])
 
   const handleKillProcess = async () => {
     if (!confirm('Are you sure you want to stop this process?')) {

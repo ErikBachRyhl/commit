@@ -81,11 +81,15 @@ export function CommitSelector({ open, onOpenChange, repoId }: CommitSelectorPro
       
       if (selectedMode === 'since' && selectedCommit) {
         body.sinceSha = selectedCommit
+        console.log('[CommitSelector] Processing since commit:', selectedCommit)
       } else if (selectedMode === 'latest') {
         // Process only the very latest commit
         body.sinceSha = commits[0]?.sha // Will process HEAD only
+        console.log('[CommitSelector] Processing latest commit:', commits[0]?.sha)
       }
       // 'all' mode: no sinceSha, processes everything
+
+      console.log('[CommitSelector] Starting process with body:', body)
 
       const response = await fetch('/api/process', {
         method: 'POST',
@@ -95,16 +99,20 @@ export function CommitSelector({ open, onOpenChange, repoId }: CommitSelectorPro
         body: JSON.stringify(body),
       })
 
+      console.log('[CommitSelector] Response status:', response.status)
+
       if (!response.ok) {
         const error = await response.json()
+        console.error('[CommitSelector] Error response:', error)
         throw new Error(error.error || 'Failed to start processing')
       }
 
       const data = await response.json()
+      console.log('[CommitSelector] Success! Run ID:', data.runId)
       onOpenChange(false)
       router.push(`/runs/${data.runId}`)
     } catch (error: any) {
-      console.error('Error starting process:', error)
+      console.error('[CommitSelector] Error starting process:', error)
       toast.error(error.message || 'Failed to start processing')
     } finally {
       setProcessing(false)

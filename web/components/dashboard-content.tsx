@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { RepoPicker } from "@/components/repo-picker"
 import { CommitSelector } from "@/components/commit-selector"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { GitBranch, LogOut, Settings, PlayCircle, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
@@ -130,6 +131,7 @@ export function DashboardContent({
             )}
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Link href="/settings">
               <Button variant="ghost" size="sm">
                 <Settings className="h-4 w-4 mr-2" />

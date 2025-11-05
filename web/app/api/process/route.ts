@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { updateProcessingRun } from '@/lib/db-helpers'
 import { spawnCLIProcess } from '@/lib/cli'
 import { registerProcess } from '@/lib/process-manager'
 import fs from 'fs/promises'
@@ -105,6 +106,23 @@ export async function POST(req: NextRequest) {
       ? path.join(tempDir, 'notes.apkg')
       : undefined
 
+    // Temporarily move state file to force reprocessing when using --since
+    const homeDir = os.homedir()
+    const stateFile = path.join(homeDir, '.commit_state.json')
+    const stateBackup = path.join(homeDir, '.commit_state.backup.json')
+    let stateFileMoved = false
+
+    if (options.sinceSha) {
+      try {
+        await fs.access(stateFile)
+        await fs.rename(stateFile, stateBackup)
+        stateFileMoved = true
+        console.log('Temporarily moved state file to force reprocessing')
+      } catch {
+        // State file doesn't exist, that's fine
+      }
+    }
+
     // Spawn CLI process
     try {
       const cliProcess = spawnCLIProcess({
@@ -118,55 +136,62 @@ export async function POST(req: NextRequest) {
       })
 
       // Register process for SSE streaming
-      registerProcess(run.id, cliProcess)
+          registerProcess(run.id, cliProcess)
 
-      // Update run status to running
-      await prisma.processingRun.update({
-        where: { id: run.id },
-        data: {
-          status: 'running',
-          startedAt: new Date(),
-        },
-      })
-
-      // Handle process completion in background
-      cliProcess.onData(async (event) => {
-        if (event.type === 'exit') {
-          const success = event.data === 0
-          
-          await prisma.processingRun.update({
-            where: { id: run.id },
-            data: {
-              status: success ? 'succeeded' : 'failed',
-              endedAt: new Date(),
-              apkgPath: success && outputPath ? outputPath : undefined,
-            },
+          // Update run status to running
+          await updateProcessingRun(run.id, {
+            status: 'running',
+            startedAt: new Date(),
           })
 
-          // Cleanup temp directory (keep output file if it exists)
-          try {
-            if (outputPath) {
-              // Move output file before cleanup
-              const finalOutputPath = path.join(os.tmpdir(), `notes-${run.id}.apkg`)
+      // Handle process completion in background
+          cliProcess.onData(async (event) => {
+            if (event.type === 'exit') {
+              const success = event.data === 0
+
+              // Restore state file if we moved it
+              if (stateFileMoved) {
+                try {
+                  await fs.rename(stateBackup, stateFile)
+                  console.log('Restored state file')
+                } catch (error) {
+                  console.error('Failed to restore state file:', error)
+                }
+              }
+
               try {
-                await fs.rename(outputPath, finalOutputPath)
-                // Update DB with final path
-                await prisma.processingRun.update({
-                  where: { id: run.id },
-                  data: { apkgPath: finalOutputPath },
+                await updateProcessingRun(run.id, {
+                  status: success ? 'succeeded' : 'failed',
+                  endedAt: new Date(),
+                  apkgPath: success && outputPath ? outputPath : undefined,
                 })
-              } catch {
-                // Output file might not exist if no cards were generated
+              } catch (error) {
+                console.error('Failed to update run status:', error)
+              }
+
+              // Cleanup temp directory (keep output file if it exists)
+              try {
+                if (outputPath) {
+                  // Move output file before cleanup
+                  const finalOutputPath = path.join(os.tmpdir(), `notes-${run.id}.apkg`)
+                  try {
+                    await fs.rename(outputPath, finalOutputPath)
+                    // Update DB with final path (with retry)
+                    await updateProcessingRun(run.id, {
+                      apkgPath: finalOutputPath,
+                    })
+                  } catch {
+                    // Output file might not exist if no cards were generated
+                  }
+                }
+                
+                // Clean up temp directory
+                await fs.rm(tempDir, { recursive: true, force: true })
+              } catch (error) {
+                console.error('Failed to cleanup temp directory:', error)
               }
             }
-            
-            // Clean up temp directory
-            await fs.rm(tempDir, { recursive: true, force: true })
-          } catch (error) {
-            console.error('Failed to cleanup temp directory:', error)
-          }
-        }
-      })
+          })
 
       return NextResponse.json({
         runId: run.id,
@@ -175,13 +200,25 @@ export async function POST(req: NextRequest) {
       })
     } catch (error: any) {
       // Failed to start process
-      await prisma.processingRun.update({
-        where: { id: run.id },
-        data: {
+      
+      // Restore state file if we moved it
+      if (stateFileMoved) {
+        try {
+          await fs.rename(stateBackup, stateFile)
+          console.log('Restored state file after error')
+        } catch (restoreError) {
+          console.error('Failed to restore state file:', restoreError)
+        }
+      }
+
+      try {
+        await updateProcessingRun(run.id, {
           status: 'failed',
           endedAt: new Date(),
-        },
-      })
+        })
+      } catch (dbError) {
+        console.error('Failed to update run status to failed:', dbError)
+      }
 
       throw error
     }

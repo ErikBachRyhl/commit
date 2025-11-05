@@ -1,13 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, Download } from "lucide-react"
+import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, Download, StopCircle } from "lucide-react"
 import { LiveConsole } from "@/components/live-console"
 import { CardCarousel } from "@/components/card-carousel"
+import { toast } from "sonner"
 
 type Run = {
   id: string
@@ -39,9 +41,63 @@ type Run = {
   }>
 }
 
-export function RunDetailContent({ run }: { run: Run }) {
+export function RunDetailContent({ run: initialRun }: { run: Run }) {
+  const router = useRouter()
+  const [killing, setKilling] = useState(false)
+  const [run, setRun] = useState(initialRun)
   const isRunning = run.status === 'running' || run.status === 'queued'
   const hasCards = run.suggestions.length > 0
+
+  // Poll for status updates when running
+  useEffect(() => {
+    if (!isRunning) return
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/runs/${run.id}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.run) {
+            setRun(data.run)
+            // If status changed from running, refresh the page to get cards
+            if (data.run.status !== 'running' && data.run.status !== 'queued') {
+              router.refresh()
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error polling run status:', error)
+      }
+    }, 2000) // Poll every 2 seconds
+
+    return () => clearInterval(interval)
+  }, [isRunning, run.id, router])
+
+  const handleKillProcess = async () => {
+    if (!confirm('Are you sure you want to stop this process?')) {
+      return
+    }
+
+    setKilling(true)
+    try {
+      const response = await fetch(`/api/process/${run.id}/kill`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to kill process')
+      }
+
+      toast.success('Process stopped successfully')
+      router.refresh()
+    } catch (error: any) {
+      console.error('Error killing process:', error)
+      toast.error(error.message || 'Failed to stop process')
+    } finally {
+      setKilling(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,18 +117,31 @@ export function RunDetailContent({ run }: { run: Run }) {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-3xl font-bold">Processing Run</h1>
-            <Badge variant={
-              run.status === 'succeeded' ? 'default' :
-              run.status === 'failed' ? 'destructive' :
-              run.status === 'running' ? 'secondary' :
-              'outline'
-            }>
-              {run.status === 'succeeded' && <CheckCircle className="h-3 w-3 mr-1" />}
-              {run.status === 'failed' && <XCircle className="h-3 w-3 mr-1" />}
-              {run.status === 'running' && <Clock className="h-3 w-3 mr-1 animate-spin" />}
-              {run.status === 'queued' && <AlertCircle className="h-3 w-3 mr-1" />}
-              {run.status}
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Badge variant={
+                run.status === 'succeeded' ? 'default' :
+                run.status === 'failed' ? 'destructive' :
+                run.status === 'running' ? 'secondary' :
+                'outline'
+              }>
+                {run.status === 'succeeded' && <CheckCircle className="h-3 w-3 mr-1" />}
+                {run.status === 'failed' && <XCircle className="h-3 w-3 mr-1" />}
+                {run.status === 'running' && <Clock className="h-3 w-3 mr-1 animate-spin" />}
+                {run.status === 'queued' && <AlertCircle className="h-3 w-3 mr-1" />}
+                {run.status}
+              </Badge>
+              {isRunning && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleKillProcess}
+                  disabled={killing}
+                >
+                  <StopCircle className="h-4 w-4 mr-2" />
+                  {killing ? 'Stopping...' : 'Stop Process'}
+                </Button>
+              )}
+            </div>
           </div>
           <p className="text-muted-foreground">
             {run.repo ? `${run.repo.owner}/${run.repo.repo}` : 'Unknown repository'}

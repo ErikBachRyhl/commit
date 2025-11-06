@@ -200,32 +200,77 @@ export function RunDetailContent({ run: initialRun }: { run: Run }) {
 
           {/* Card Carousel (when completed with cards) */}
           {!isRunning && hasCards && (
-            <>
-              <CardCarousel runId={run.id} cards={run.suggestions} />
-              
-              {/* Download Section */}
-              {run.apkgPath && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Export Cards</CardTitle>
-                    <CardDescription>
-                      Download your accepted cards as an Anki package file
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <a href={`/runs/${run.id}/download`} download>
-                      <Button>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download .apkg File
-                      </Button>
-                    </a>
+            <CardCarousel runId={run.id} cards={run.suggestions} />
+          )}
+
+          {/* Download Section - Show whenever run succeeded */}
+          {!isRunning && run.status === 'succeeded' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Export Cards</CardTitle>
+                <CardDescription>
+                  Download your accepted cards as an Anki package file
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {run.apkgPath ? (
+                  <>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(`/runs/${run.id}/download`)
+                          if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({}))
+                            throw new Error(errorData.error || 'Failed to download file')
+                          }
+                          
+                          const blob = await response.blob()
+                          const url = window.URL.createObjectURL(blob)
+                          const a = document.createElement('a')
+                          a.href = url
+                          
+                          // Get filename from Content-Disposition header or use default
+                          const contentDisposition = response.headers.get('Content-Disposition')
+                          let filename = 'notes.apkg'
+                          if (contentDisposition) {
+                            const filenameMatch = contentDisposition.match(/filename="(.+)"/)
+                            if (filenameMatch) {
+                              filename = filenameMatch[1]
+                            }
+                          }
+                          
+                          a.download = filename
+                          document.body.appendChild(a)
+                          a.click()
+                          window.URL.revokeObjectURL(url)
+                          document.body.removeChild(a)
+                          
+                          toast.success('Download started!')
+                        } catch (error: any) {
+                          console.error('Download error:', error)
+                          toast.error(error.message || 'Failed to download file')
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download .apkg File
+                    </Button>
                     <p className="text-xs text-muted-foreground mt-2">
                       Import this file into Anki to add the accepted cards to your deck
                     </p>
-                  </CardContent>
-                </Card>
-              )}
-            </>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      No .apkg file was generated for this run. This might happen if no cards were created or if the file was cleaned up.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Check the console output above for details about what was processed.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
 
           {/* Empty State */}

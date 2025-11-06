@@ -149,7 +149,42 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
               </p>
             </div>
             <div className="flex gap-2 justify-center">
-              <Button onClick={() => window.location.href = `/runs/${runId}/download`}>
+              <Button
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`/runs/${runId}/download`)
+                    if (!response.ok) {
+                      throw new Error('Failed to download file')
+                    }
+                    
+                    const blob = await response.blob()
+                    const url = window.URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    
+                    // Get filename from Content-Disposition header or use default
+                    const contentDisposition = response.headers.get('Content-Disposition')
+                    let filename = 'notes.apkg'
+                    if (contentDisposition) {
+                      const filenameMatch = contentDisposition.match(/filename="(.+)"/)
+                      if (filenameMatch) {
+                        filename = filenameMatch[1]
+                      }
+                    }
+                    
+                    a.download = filename
+                    document.body.appendChild(a)
+                    a.click()
+                    window.URL.revokeObjectURL(url)
+                    document.body.removeChild(a)
+                    
+                    toast.success('Download started!')
+                  } catch (error: any) {
+                    console.error('Download error:', error)
+                    toast.error(error.message || 'Failed to download file')
+                  }
+                }}
+              >
                 Download .apkg
               </Button>
               <Button variant="outline" onClick={() => window.location.href = '/'}>

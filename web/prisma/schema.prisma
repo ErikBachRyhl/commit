@@ -173,6 +173,12 @@ model ProcessingRun {
   suggestions CardSuggestion[]
 }
 
+enum ReviewStatus {
+  PENDING
+  ACCEPTED
+  DISCARDED
+}
+
 model CardSuggestion {
   id          String         @id @default(cuid())
   runId       String
@@ -185,15 +191,21 @@ model CardSuggestion {
   cardType    String         @default("basic") // 'basic' | 'cloze'
   sourceFile  String?
   sourceLine  Int?
-  state       String         @default("pending") // 'pending' | 'accepted' | 'discarded'
+  status      ReviewStatus   @default(PENDING) // PENDING | ACCEPTED | DISCARDED
   metadata    Json?          // Additional metadata from LLM
+  
+  // Review workflow fields
+  frontEdited String?
+  backEdited  String?
+  isEdited    Boolean        @default(false)
+  regenCount  Int           @default(0)
   
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   
   actions     CardAction[]
 
-  @@index([runId, state])
+  @@index([runId, status])
 }
 
 model CardAction {
@@ -204,4 +216,30 @@ model CardAction {
   action       String         // 'add' | 'discard' | 'recreate'
   payload      Json?          // Additional action data
   createdAt    DateTime       @default(now())
+}
+
+// New JSONL-based card suggestion model for lecture mode
+model LectureCard {
+  id         String   @id @default(cuid())
+  course     String
+  env        String
+  file       String
+  startLine  Int
+  endLine    Int
+  sha        String?
+  deck       String
+  model      String
+  front      String   @db.Text
+  back       String   @db.Text
+  tags       String   // Space-delimited
+  priority   Int      @default(0)
+  guidShort  String
+  guidFull   String
+  noteId     BigInt?
+  wasUpdate  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  
+  @@index([course, sha])
+  @@index([guidFull])
+  @@map("lecture_cards")
 }

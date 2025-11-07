@@ -32,10 +32,10 @@ export async function POST(
       )
     }
 
-    // Update card state to discarded
+    // Update card status to discarded
     await prisma.cardSuggestion.update({
       where: { id },
-      data: { state: 'discarded' },
+      data: { status: 'DISCARDED' },
     })
 
     // Create action record

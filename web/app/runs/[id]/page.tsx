@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { RunDetailContent } from "@/components/run-detail-content"
+import { ReviewStatus } from "@prisma/client"
 
 export default async function RunDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -21,8 +22,8 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
       repo: true,
       suggestions: {
         where: {
-          state: {
-            not: 'discarded',
+          status: {
+            not: ReviewStatus.DISCARDED,
           },
         },
         orderBy: {

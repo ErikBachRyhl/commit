@@ -16,7 +16,7 @@ const execAsync = promisify(exec)
 const ProcessSchema = z.object({
   repoId: z.string(),
   sinceSha: z.string().optional(),
-  offline: z.boolean().optional().default(true), // Default to offline for MVP
+  offline: z.boolean().optional().default(false), // Default to live injection (Process & Send mode)
   enableLlm: z.boolean().optional(),
   provider: z.string().optional(),
   model: z.string().optional(),
@@ -159,15 +159,30 @@ export async function POST(req: NextRequest) {
 
     // Spawn CLI process
     try {
-      const cliProcess = spawnCLIProcess({
+      // For Process & Send mode: enable JSONL streaming and live injection
+      // For Build APKG mode: use offline, no JSONL needed
+      const spawnOptions = {
         repoPath,
         offline: options.offline,
         output: outputPath,
         sinceSha: actualSinceSha,
-        enableLlm: options.enableLlm,
+        enableLlm: options.enableLlm ?? true, // Default to enabled
         provider: options.provider,
         model: options.model,
-      })
+        ...(options.offline ? {} : {
+          // Only enable JSONL streaming for live injection mode
+          jsonlOut: '-' as const,
+          runId: run.id,
+          syncMode: 'disabled', // Disable auto-import for web review flow
+        }),
+      }
+      
+      console.log('[API /process] Spawning CLI with options:', JSON.stringify({
+        ...spawnOptions,
+        runId: spawnOptions.runId || '(not set)',
+      }, null, 2))
+      
+      const cliProcess = spawnCLIProcess(spawnOptions)
 
       // Register process for SSE streaming
           registerProcess(run.id, cliProcess)
@@ -178,9 +193,62 @@ export async function POST(req: NextRequest) {
             startedAt: new Date(),
           })
 
-      // Handle process completion in background
-          cliProcess.onData(async (event) => {
-            if (event.type === 'exit') {
+      // Handle CLI process events (stdout, stderr, exit)
+      let stdoutBuffer = ''
+      cliProcess.onData(async (event) => {
+        // Parse JSONL output for card data
+        if (event.type === 'stdout') {
+          const chunk = String(event.data)
+          stdoutBuffer += chunk
+          
+          // Process complete lines (handle chunks that may split mid-line)
+          let newlineIndex
+          while ((newlineIndex = stdoutBuffer.indexOf('\n')) >= 0) {
+            const line = stdoutBuffer.slice(0, newlineIndex)
+            stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1)
+            
+            if (line.startsWith('CARD\t')) {
+              const jsonStr = line.slice(5).trim()
+              try {
+                const card = JSON.parse(jsonStr)
+                // Move deck into metadata (Prisma schema doesn't have deck at top level)
+                const metadata = {
+                  env: card.env,
+                  course: card.course,
+                  slot: card.slot,
+                  blockGuid: card.blockGuid,
+                  blockGuidShort: card.blockGuidShort,
+                  noteGuid: card.noteGuid,
+                  action: card.action,
+                  ...(card.deck ? { deck: card.deck } : {}),
+                }
+                
+                // Save to CardSuggestion table (existing model)
+                await prisma.cardSuggestion.create({
+                  data: {
+                    runId: card.runId || run.id, // Fallback to run.id if not in card
+                    idx: card.idx ?? 0,
+                    front: card.front || '',
+                    back: card.back || '',
+                    tags: Array.isArray(card.tags) ? card.tags : [],
+                    cardType: card.cardType || 'basic',
+                    sourceFile: card.sourceFile || null,
+                    sourceLine: card.sourceLine || null,
+                    status: 'PENDING',
+                    metadata,
+                  },
+                })
+                console.log(`[API /process] ✅ Saved card ${card.idx ?? '?'}: ${card.blockGuidShort || 'unknown'}`)
+              } catch (error) {
+                console.error('[API /process] ❌ Failed to parse/save card JSON:', error)
+                console.error('[API /process] Raw line:', jsonStr.substring(0, 200))
+              }
+            }
+          }
+        }
+        
+        // Handle process completion
+        if (event.type === 'exit') {
               const success = event.data === 0
 
               try {

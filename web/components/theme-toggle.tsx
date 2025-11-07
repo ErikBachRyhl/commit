@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useMounted } from "@/hooks/use-mounted"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -14,6 +15,9 @@ import {
 
 export function ThemeToggle() {
   const { setTheme, theme } = useTheme()
+  const mounted = useMounted()
+
+  if (!mounted) return null // hydrate-safe
 
   return (
     <DropdownMenu>

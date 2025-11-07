@@ -5,8 +5,11 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, RefreshCw, FileText, MapPin } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { CheckCircle, XCircle, RefreshCw, FileText, MapPin, Edit } from "lucide-react"
 import { toast } from "sonner"
+import MathText from "@/components/MathText"
 
 type CardData = {
   id: string
@@ -17,7 +20,10 @@ type CardData = {
   cardType: string
   sourceFile: string | null
   sourceLine: number | null
-  state: string
+  status: string
+  frontEdited?: string | null
+  backEdited?: string | null
+  isEdited?: boolean
   metadata: any
 }
 
@@ -25,22 +31,57 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showBack, setShowBack] = useState(false)
   const [processedCards, setProcessedCards] = useState<Set<string>>(new Set())
-  const [acceptedCount, setAcceptedCount] = useState(0)
   const [direction, setDirection] = useState(0)
+  const [showEdit, setShowEdit] = useState(false)
+  const [editFront, setEditFront] = useState("")
+  const [editBack, setEditBack] = useState("")
+  const [localCards, setLocalCards] = useState(cards)
+  const [busyCardId, setBusyCardId] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
 
-  const currentCard = cards[currentIndex]
-  const remainingCards = cards.length - processedCards.size
-  const progress = processedCards.size / cards.length
+  const currentCard = localCards[currentIndex]
+  
+  // Compute progress from current card statuses (prevents negative/overflow)
+  const total = localCards.length
+  const acceptedCount = localCards.filter(c => c.status === 'ACCEPTED').length
+  const discardedCount = localCards.filter(c => c.status === 'DISCARDED').length
+  const reviewedCount = acceptedCount + discardedCount
+  const remainingCards = total - reviewedCount
+  const progress = total > 0 ? reviewedCount / total : 0
+
+  // Update local cards when props change
+  useEffect(() => {
+    setLocalCards(cards)
+  }, [cards])
 
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyPress(e: KeyboardEvent) {
+      // Ignore repeated keydown events (held keys) to prevent spam
+      if (e.repeat) return
+      // Block all actions if a card operation is in progress
+      if (busyCardId) return
+      // Block shortcuts when edit dialog is open
+      if (showEdit) return
+      // Block shortcuts when typing in input/textarea
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+      
+      // Prevent default for action keys to avoid typing into inputs
       if (e.key === 'a' || e.key === 'A') {
-        handleAdd()
+        e.preventDefault()
+        handleAccept()
       } else if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault()
         handleDiscard()
       } else if (e.key === 'r' || e.key === 'R') {
-        handleRecreate()
+        e.preventDefault()
+        handleRegenerate()
+      } else if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault()
+        handleEditClick()
       } else if (e.key === ' ') {
         e.preventDefault()
         setShowBack(prev => !prev)
@@ -49,35 +90,46 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [currentIndex, currentCard])
+  }, [currentIndex, currentCard, busyCardId, showEdit])
 
-  async function handleAdd() {
-    if (!currentCard || processedCards.has(currentCard.id)) return
+  async function handleAccept() {
+    if (!currentCard || processedCards.has(currentCard.id) || busyCardId === currentCard.id) return
 
+    setBusyCardId(currentCard.id)
     try {
-      const response = await fetch(`/api/cards/${currentCard.id}/add`, {
-        method: 'POST',
+      const response = await fetch(`/api/cards/${currentCard.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACCEPTED' }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to add card')
+        throw new Error('Failed to accept card')
       }
 
-      toast.success('Card added!')
-      setAcceptedCount(prev => prev + 1)
+      toast.success('Card accepted!')
+      // Update local card state optimistically
+      setLocalCards(prev => prev.map(c => 
+        c.id === currentCard.id ? { ...c, status: 'ACCEPTED' } : c
+      ))
       setProcessedCards(prev => new Set(prev).add(currentCard.id))
       nextCard(1)
     } catch (error: any) {
       toast.error(error.message)
+    } finally {
+      setBusyCardId(null)
     }
   }
 
   async function handleDiscard() {
-    if (!currentCard || processedCards.has(currentCard.id)) return
+    if (!currentCard || processedCards.has(currentCard.id) || busyCardId === currentCard.id) return
 
+    setBusyCardId(currentCard.id)
     try {
-      const response = await fetch(`/api/cards/${currentCard.id}/discard`, {
-        method: 'POST',
+      const response = await fetch(`/api/cards/${currentCard.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DISCARDED' }),
       })
 
       if (!response.ok) {
@@ -85,30 +137,86 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
       }
 
       toast('Card discarded')
+      // Update local card state optimistically
+      setLocalCards(prev => prev.map(c => 
+        c.id === currentCard.id ? { ...c, status: 'DISCARDED' } : c
+      ))
       setProcessedCards(prev => new Set(prev).add(currentCard.id))
       nextCard(-1)
     } catch (error: any) {
       toast.error(error.message)
+    } finally {
+      setBusyCardId(null)
     }
   }
 
-  async function handleRecreate() {
+  async function handleRegenerate() {
     if (!currentCard) return
 
     try {
       toast.loading('Regenerating card...', { id: 'regenerate' })
 
-      const response = await fetch(`/api/cards/${currentCard.id}/recreate`, {
+      const response = await fetch(`/api/cards/${currentCard.id}/regenerate`, {
         method: 'POST',
       })
 
       if (!response.ok) {
-        throw new Error('Failed to recreate card')
+        throw new Error('Failed to regenerate card')
       }
 
-      toast.success('Card regenerated! Refresh to see updates.', { id: 'regenerate' })
+      const data = await response.json()
+      
+      // Update local card state
+      setLocalCards(prev => prev.map(card => 
+        card.id === currentCard.id 
+          ? { ...card, frontEdited: data.row.frontEdited, backEdited: data.row.backEdited, isEdited: true }
+          : card
+      ))
+
+      toast.success('Card regenerated!', { id: 'regenerate' })
     } catch (error: any) {
       toast.error(error.message, { id: 'regenerate' })
+    }
+  }
+
+  function handleEditClick() {
+    if (!currentCard) return
+    setEditFront(currentCard.isEdited && currentCard.frontEdited ? currentCard.frontEdited : currentCard.front)
+    setEditBack(currentCard.isEdited && currentCard.backEdited ? currentCard.backEdited : currentCard.back)
+    setShowEdit(true)
+  }
+
+  async function handleSaveEdit() {
+    if (!currentCard) return
+
+    try {
+      const response = await fetch(`/api/cards/${currentCard.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          front: editFront,
+          back: editBack,
+          isEdited: true,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save edits')
+      }
+
+      const data = await response.json()
+      
+      // Update local card state
+      setLocalCards(prev => prev.map(card => 
+        card.id === currentCard.id 
+          ? { ...card, frontEdited: data.row.frontEdited, backEdited: data.row.backEdited, isEdited: true }
+          : card
+      ))
+
+      toast.success('Card edited!')
+      setShowEdit(false)
+    } catch (error: any) {
+      toast.error(error.message)
     }
   }
 
@@ -118,11 +226,11 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
 
     // Find next unprocessed card
     let nextIndex = currentIndex + 1
-    while (nextIndex < cards.length && processedCards.has(cards[nextIndex].id)) {
+    while (nextIndex < localCards.length && processedCards.has(localCards[nextIndex].id)) {
       nextIndex++
     }
 
-    if (nextIndex < cards.length) {
+    if (nextIndex < localCards.length) {
       setCurrentIndex(nextIndex)
     }
   }
@@ -134,7 +242,7 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
         <CardHeader>
           <CardTitle>All Done! 🎉</CardTitle>
           <CardDescription>
-            You've reviewed all {cards.length} cards
+            You've reviewed all {localCards.length} cards
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -145,11 +253,36 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
                 {acceptedCount} cards accepted
               </p>
               <p className="text-muted-foreground">
-                {cards.length - acceptedCount} cards discarded
+                {localCards.length - acceptedCount} cards discarded
               </p>
             </div>
             <div className="flex gap-2 justify-center">
               <Button
+                onClick={async () => {
+                  if (importing) return
+                  setImporting(true)
+                  try {
+                    const response = await fetch(`/api/runs/${runId}/import`, {
+                      method: 'POST',
+                    })
+                    if (!response.ok) {
+                      const data = await response.json()
+                      throw new Error(data.error || 'Failed to import')
+                    }
+                    const data = await response.json()
+                    toast.success(`Imported ${data.imported} cards to Anki!${data.skipped ? ` (${data.skipped} already imported)` : ''}`)
+                  } catch (error: any) {
+                    toast.error(error.message || 'Failed to import cards')
+                  } finally {
+                    setImporting(false)
+                  }
+                }}
+                disabled={importing}
+              >
+                {importing ? 'Importing...' : 'Import to Anki'}
+              </Button>
+              <Button
+                variant="outline"
                 onClick={async () => {
                   try {
                     const response = await fetch(`/runs/${runId}/download`)
@@ -162,7 +295,6 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
                     const a = document.createElement('a')
                     a.href = url
                     
-                    // Get filename from Content-Disposition header or use default
                     const contentDisposition = response.headers.get('Content-Disposition')
                     let filename = 'notes.apkg'
                     if (contentDisposition) {
@@ -197,23 +329,28 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
     )
   }
 
+  const displayFront = currentCard.isEdited && currentCard.frontEdited ? currentCard.frontEdited : currentCard.front
+  const displayBack = currentCard.isEdited && currentCard.backEdited ? currentCard.backEdited : currentCard.back
+
   return (
     <div className="space-y-4">
       {/* Progress */}
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
-          Card {currentIndex + 1} of {cards.length}
-        </span>
-        <span className="text-muted-foreground">
-          {acceptedCount} accepted • {remainingCards} remaining
-        </span>
-      </div>
-
-      <div className="w-full bg-muted rounded-full h-2">
-        <div
-          className="bg-primary h-2 rounded-full transition-all"
-          style={{ width: `${progress * 100}%` }}
-        />
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            Card {currentIndex + 1} of {localCards.length}
+          </span>
+          <span className="text-muted-foreground">
+            {acceptedCount} accepted • {remainingCards} remaining
+          </span>
+        </div>
+        <div className="w-full bg-slate-200 rounded-full h-2">
+          <div
+            className="bg-emerald-500 h-2 rounded-full transition-all"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+        <div className="text-xs text-slate-500 text-center">{reviewedCount}/{total}</div>
       </div>
 
       {/* Card */}
@@ -247,42 +384,37 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
               </div>
             </CardHeader>
             <CardContent>
-              <div className="min-h-[200px] flex flex-col justify-center">
-                <AnimatePresence mode="wait">
-                  {!showBack ? (
-                    <motion.div
-                      key="front"
-                      initial={{ opacity: 0, rotateY: -90 }}
-                      animate={{ opacity: 1, rotateY: 0 }}
-                      exit={{ opacity: 0, rotateY: 90 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="text-center mb-4">
-                        <Badge variant="secondary">Front</Badge>
-                      </div>
-                      <div
-                        className="prose prose-sm max-w-none text-center"
-                        dangerouslySetInnerHTML={{ __html: currentCard.front }}
-                      />
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="back"
-                      initial={{ opacity: 0, rotateY: -90 }}
-                      animate={{ opacity: 1, rotateY: 0 }}
-                      exit={{ opacity: 0, rotateY: 90 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="text-center mb-4">
-                        <Badge variant="secondary">Back</Badge>
-                      </div>
-                      <div
-                        className="prose prose-sm max-w-none"
-                        dangerouslySetInnerHTML={{ __html: currentCard.back }}
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+              <div className="relative h-[420px] w-full [transform-style:preserve-3d]">
+                {/* FRONT - Always in DOM for MathJax */}
+                <div 
+                  className={`absolute inset-0 backface-hidden flex items-center justify-center p-6 text-center ${showBack ? 'hidden' : ''}`}
+                >
+                  <div className="w-full">
+                    <div className="text-center mb-4">
+                      <Badge variant="secondary">Front</Badge>
+                    </div>
+                    <MathText
+                      text={displayFront}
+                      nonce={`${currentCard.id}-front-${showBack ? '1' : '0'}`}
+                      className="prose prose-sm max-w-none text-center"
+                    />
+                  </div>
+                </div>
+                {/* BACK - Always in DOM for MathJax */}
+                <div 
+                  className={`absolute inset-0 backface-hidden flex items-center justify-center p-6 text-center ${!showBack ? 'hidden' : ''}`}
+                >
+                  <div className="w-full">
+                    <div className="text-center mb-4">
+                      <Badge variant="secondary">Back</Badge>
+                    </div>
+                    <MathText
+                      text={displayBack}
+                      nonce={`${currentCard.id}-back-${showBack ? '1' : '0'}`}
+                      className="prose prose-sm max-w-none text-center"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Tags */}
@@ -306,6 +438,7 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
           variant="destructive"
           size="lg"
           onClick={handleDiscard}
+          disabled={busyCardId === currentCard?.id}
         >
           <XCircle className="h-5 w-5 mr-2" />
           Discard (D)
@@ -313,25 +446,70 @@ export function CardCarousel({ runId, cards }: { runId: string; cards: CardData[
         <Button
           variant="outline"
           size="lg"
-          onClick={handleRecreate}
+          onClick={handleRegenerate}
+          disabled={busyCardId === currentCard?.id}
         >
           <RefreshCw className="h-5 w-5 mr-2" />
-          Recreate (R)
+          Regenerate (R)
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={handleEditClick}
+          disabled={busyCardId === currentCard?.id}
+        >
+          <Edit className="h-5 w-5 mr-2" />
+          Edit (E)
         </Button>
         <Button
           variant="default"
           size="lg"
-          onClick={handleAdd}
+          onClick={handleAccept}
+          disabled={busyCardId === currentCard?.id}
         >
           <CheckCircle className="h-5 w-5 mr-2" />
-          Add (A)
+          Accept (A)
         </Button>
       </div>
 
       <p className="text-center text-sm text-muted-foreground">
-        Click card or press Space to flip • Use A/D/R keys for actions
+        Click card or press Space to flip • Use A/D/R/E keys for actions
       </p>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Card</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Front</label>
+              <Textarea
+                value={editFront}
+                onChange={(e) => setEditFront(e.target.value)}
+                className="min-h-[150px] font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Back</label>
+              <Textarea
+                value={editBack}
+                onChange={(e) => setEditBack(e.target.value)}
+                className="min-h-[150px] font-mono"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEdit(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
-

@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, Download, StopCircle } from "lucide-react"
-import { LiveConsole } from "@/components/live-console"
+import RunConsole from "@/components/run-console"
 import { CardCarousel } from "@/components/card-carousel"
 import { toast } from "sonner"
 
@@ -36,7 +37,10 @@ type Run = {
     cardType: string
     sourceFile: string | null
     sourceLine: number | null
-    state: string
+    status: string
+    frontEdited?: string | null
+    backEdited?: string | null
+    isEdited?: boolean
     metadata: any
   }>
 }
@@ -158,45 +162,18 @@ export function RunDetailContent({ run: initialRun }: { run: Run }) {
         </div>
 
         <div className="grid gap-6">
-          {/* Stats Card */}
+          {/* Console Output */}
           <Card>
             <CardHeader>
-              <CardTitle>Statistics</CardTitle>
+              <CardTitle>Console Output</CardTitle>
+              <CardDescription>
+                Live output from the processing run
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div>
-                  <div className="text-2xl font-bold">{run.filesProcessed ?? '-'}</div>
-                  <div className="text-xs text-muted-foreground">Files Processed</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">{run.blocksExtracted ?? '-'}</div>
-                  <div className="text-xs text-muted-foreground">Blocks Extracted</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-green-600">{run.notesCreated ?? '-'}</div>
-                  <div className="text-xs text-muted-foreground">Notes Created</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-blue-600">{run.notesUpdated ?? '-'}</div>
-                  <div className="text-xs text-muted-foreground">Notes Updated</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-600">{run.notesSkipped ?? '-'}</div>
-                  <div className="text-xs text-muted-foreground">Notes Skipped</div>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t text-sm text-muted-foreground">
-                <p>Started: {run.startedAt ? new Date(run.startedAt).toLocaleString() : 'Not started'}</p>
-                {run.endedAt && (
-                  <p>Ended: {new Date(run.endedAt).toLocaleString()}</p>
-                )}
-              </div>
+              <RunConsole runId={run.id} />
             </CardContent>
           </Card>
-
-          {/* Console Output */}
-          <LiveConsole runId={run.id} />
 
           {/* Card Carousel (when completed with cards) */}
           {!isRunning && hasCards && (

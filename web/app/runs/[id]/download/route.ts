@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { readFile } from 'fs/promises'
-import path from 'path'
+import { NextRequest, NextResponse } from "next/server"
+import { getSession } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+import { spawnCLI } from "@/lib/spawn"
+import { readFile } from "fs/promises"
+import { join } from "path"
+import { tmpdir } from "os"
 
 export async function GET(
   req: NextRequest,
@@ -10,66 +12,82 @@ export async function GET(
 ) {
   try {
     const session = await getSession()
-    
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { id } = await params
+    const { id: runId } = await params
 
-    // Get the run
-    const run = await prisma.processingRun.findUnique({
-      where: {
-        id,
-        userId: session.user.id,
-      },
-      include: {
-        repo: true,
-      },
+    // Get accepted cards for this run
+    const rows = await prisma.cardSuggestion.findMany({
+      where: { runId, status: "ACCEPTED" },
+      orderBy: { idx: "asc" },
     })
 
-    if (!run) {
+    if (!rows.length) {
       return NextResponse.json(
-        { error: 'Run not found' },
-        { status: 404 }
+        { ok: false, error: "no_accepted" },
+        { status: 400 }
       )
     }
 
-    if (!run.apkgPath) {
+    const repoPath = process.env.NOTES_REPO_PATH || process.env.LOCAL_REPO_PATH
+    if (!repoPath) {
       return NextResponse.json(
-        { error: '.apkg file not found for this run' },
-        { status: 404 }
-      )
-    }
-
-    // Read the .apkg file
-    try {
-      const fileBuffer = await readFile(run.apkgPath)
-      
-      // Generate filename
-      const repoName = run.repo ? `${run.repo.owner}-${run.repo.repo}` : 'notes'
-      const timestamp = new Date().toISOString().slice(0, 10)
-      const filename = `${repoName}-${timestamp}.apkg`
-
-      // Return as download
-      return new NextResponse(fileBuffer, {
-        headers: {
-          'Content-Type': 'application/x-anki-deck',
-          'Content-Disposition': `attachment; filename="${filename}"`,
-          'Content-Length': fileBuffer.length.toString(),
-        },
-      })
-    } catch (error) {
-      console.error('Error reading .apkg file:', error)
-      return NextResponse.json(
-        { error: '.apkg file not accessible' },
+        { ok: false, error: "NOTES_REPO_PATH not configured" },
         { status: 500 }
       )
     }
+
+    // Map rows -> CLI input format
+    const payload = rows.map((r) => {
+      const metadata = (r.metadata || {}) as any
+      return {
+        front: r.isEdited && r.frontEdited ? r.frontEdited : r.front,
+        back: r.isEdited && r.backEdited ? r.backEdited : r.back,
+        tags: r.tags,
+        cardType: r.cardType,
+        ...metadata,
+      }
+    })
+
+    const outPath = join(tmpdir(), `commit-${runId}.apkg`)
+
+    const { code, stderr } = await spawnCLI({
+      args: [
+        "build-apkg-selected",
+        "--repo",
+        repoPath,
+        "--input",
+        "-",
+        "--output",
+        outPath,
+      ],
+      stdin: JSON.stringify(payload),
+      cwd: process.cwd(),
+    })
+
+    if (code !== 0) {
+      console.error("[API /runs/:id/download] CLI failed:", stderr)
+      return NextResponse.json(
+        { ok: false, error: "cli_failed", stderr },
+        { status: 500 }
+      )
+    }
+
+    const buf = await readFile(outPath)
+
+    return new NextResponse(buf, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="notes-${runId}.apkg"`,
+      },
+    })
   } catch (error: any) {
-    console.error('Error downloading .apkg:', error)
+    console.error("[API /runs/:id/download] Error:", error)
     return NextResponse.json(
-      { error: error.message || 'Failed to download .apkg' },
+      { error: error.message || "Failed to download .apkg" },
       { status: 500 }
     )
   }

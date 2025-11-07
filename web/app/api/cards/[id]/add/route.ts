@@ -32,10 +32,10 @@ export async function POST(
       )
     }
 
-    // Update card state to accepted
+    // Update card status to accepted
     await prisma.cardSuggestion.update({
       where: { id },
-      data: { state: 'accepted' },
+      data: { status: 'ACCEPTED' },
     })
 
     // Create action record
